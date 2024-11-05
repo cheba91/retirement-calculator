@@ -42,7 +42,7 @@ const updateRangeSliderScale = (value, currentValue, minValue, maxValue, optimal
   const barWidth = (maxValue - minValue) / (fixedBarCount - 1);
   const optimalValueBarIndex = Math.round((optimalValue - minValue) / barWidth);
 
-  console.log('optimalValue', optimalValue, 'optimalValueBarIndex', optimalValueBarIndex, 'Current index', index);
+  // console.log('optimalValue', optimalValue, 'optimalValueBarIndex', optimalValueBarIndex, 'Current index', index);
 
   // Gray color the optimal index
   if (index === optimalValueBarIndex) return '#E9EBF2';
@@ -74,23 +74,23 @@ const updateRangeSliderScale = (value, currentValue, minValue, maxValue, optimal
   }
 };
 
-// const updateAllRangesliders = () => {
-//   // Update all range sliders
-//   calcElementsAndRanges.forEach((element) => {
-//     const { selector, slider, min, max, step } = element;
-//     const currentValue = +slider.value;
-//     const barWidth = (max - min) / (fixedBarCount - 1);
-//     const optimalValue = optimalValues[selector];
-//     const isReversedScale = optimalValues[`${selector}-reversed`];
-//     const optimalValueBarIndex = Math.round((optimalValue - min) / barWidth);
-//     const bars = optimalValues[`${selector}-bars`];
+const updateAllRangesliders = () => {
+  console.log(optimalValues);
+  // Update all range sliders
+  calcElementsAndRanges.forEach((element) => {
+    const { selector, slider, min, max, step } = element;
+    const currentValue = +slider.value;
+    const barWidth = (max - min) / (fixedBarCount - 1);
+    const optimalValue = optimalValues[selector];
+    const isReversedScale = optimalValues[`${selector}-reversed`];
+    const bars = optimalValues[`${selector}-bars`];
 
-//     bars.attr('fill', (d, i) => {
-//       const value = min + barWidth * i;
-//       return updateRangeSliderScale(value, currentValue, min, max, optimalValue, isReversedScale, i);
-//     });
-//   });
-// };
+    bars.attr('fill', (d, i) => {
+      const value = min + barWidth * i;
+      return updateRangeSliderScale(value, currentValue, min, max, optimalValue, isReversedScale, i);
+    });
+  });
+};
 
 // Update the handle position and value
 const updateHandle = (selector, value) => {
@@ -169,17 +169,17 @@ const initRangeSliders = () => {
       .attr('width', barWidth) // Set the width of the bar
       .attr('height', chartHeight);
 
-    // Save bars
+    // Save bars for coloring later
     optimalValues[`${selector}-bars`] = bars;
 
     const updateBars = () => {
       const currentValue = +slider.value;
       bars.attr('fill', (d, i) => {
-        const value = minValue + (maxValue - minValue) * (i / (fixedBarCount - 1));
-        return updateRangeSliderScale(value, currentValue, minValue, maxValue, optimalValues[selector], optimalValues[`${selector}-reversed`], i);
+        // const value = minValue + (maxValue - minValue) * (i / (fixedBarCount - 1));
+        // return updateRangeSliderScale(value, currentValue, minValue, maxValue, optimalValues[selector], optimalValues[`${selector}-reversed`], i);
         // return updateRangeSliderScale(value, currentValue, minValue, maxValue, i);
-        // updateAllRangesliders();
       });
+      updateAllRangesliders();
       updateHandle(selector, currentValue);
     };
 
@@ -914,8 +914,6 @@ const runCalculations = () => {
 
     totalBalancesRoth = totalBalancesRothL;
     // console.log('Roth IRA selected, calculating for Roth', totalBalancesRoth);
-  } else {
-    // console.log('Roth IRA selected, not calculating for Roth');
   }
 
   const annualBudgetAtRetirement = getAnnualBudgetAtRetirement(annualCashExpenses, currentYear + (inputValues['retirement-age'] - currentAge));
@@ -927,31 +925,16 @@ const runCalculations = () => {
   console.log('Projected Portfolio at Death: ', formatCurrency(projectedPortfolioAtDeath));
 
   //------------------ Simulation
-  const throttle = (func, limit) => {
-    let lastCall = 0;
-
-    return (...args) => {
-      const now = Date.now();
-      if (now - lastCall >= limit) {
-        lastCall = now;
-        func(...args);
-      }
-    };
-  };
-  const _runSimulation = (projectedPortfolioAtDeath) => {
+  const _runSimulation = () => {
     // TODO: Handle if optimal value is not found. Set to either max or min
     calcElementsAndRanges.forEach((calc) => {
       const selector = calc.selector;
       const minRange = calc.min;
       const maxRange = calc.max;
       const step = calc.step;
-      const value = +calc.element.value;
-      const initialResultValue = projectedPortfolioAtDeath;
-      let isZeroValue = false;
-
       // console.log(value, initialResultValue, selector, minRange, maxRange, step);
 
-      // Retirement age
+      // Simulation retirement age
       if (selector === 'retirement-age') {
         // Loop until we find the value where 0 occurs for the first time
         for (let i = minRange; i <= maxRange; i += step) {
@@ -1054,9 +1037,13 @@ const runCalculations = () => {
             optimalValues['retirement-age'] = i;
             break;
           }
+
+          // If last loop and the retirement was never successful
+          if (i >= maxRange) optimalValues['retirement-age'] = maxRange;
         }
         optimalValues['retirement-age-reversed'] = false;
-        // Expectancy
+
+        // Simulation expectancy
       } else if (selector === 'expectancy') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfDeathL = currentYear - currentAge + i;
@@ -1155,8 +1142,13 @@ const runCalculations = () => {
             optimalValues['expectancy'] = i - 1;
             break;
           }
+
+          // If last loop and retirement never failed
+          if (i >= maxRange) optimalValues['expectancy'] = maxRange;
         }
         optimalValues['expectancy-reversed'] = true;
+
+        // Simulation expected stocks growth rate
       } else if (selector === 'expected-stocks') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
@@ -1259,8 +1251,13 @@ const runCalculations = () => {
             optimalValues['expected-stocks'] = i;
             break;
           }
+
+          // If last loop and the retirement was never successful
+          if (i >= maxRange) optimalValues['expected-stocks'] = maxRange;
         }
         optimalValues['expected-stocks-reversed'] = false;
+
+        // Simulation expected bonds growth rate
       } else if (selector === 'expected-bonds') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
@@ -1363,8 +1360,13 @@ const runCalculations = () => {
             optimalValues['expected-bonds'] = i;
             break;
           }
+
+          // If last loop and the retirement was never successful
+          if (i >= maxRange) optimalValues['expected-bonds'] = maxRange;
         }
         optimalValues['expected-bonds-reversed'] = false;
+
+        // Simulation expected cash growth rate
       } else if (selector === 'expected-cash') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
@@ -1467,8 +1469,13 @@ const runCalculations = () => {
             optimalValues['expected-cash'] = i;
             break;
           }
+
+          // If last loop and the retirement was never successful
+          if (i >= maxRange) optimalValues['expected-cash'] = maxRange;
         }
         optimalValues['expected-cash-reversed'] = false;
+
+        // Simulation expected bitcoin growth rate
       } else if (selector === 'expected-btc') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
@@ -1571,8 +1578,13 @@ const runCalculations = () => {
             optimalValues['expected-btc'] = i;
             break;
           }
+
+          // If last loop and the retirement was never successful
+          if (i >= maxRange) optimalValues['expected-btc'] = maxRange;
         }
         optimalValues['expected-btc-reversed'] = false;
+
+        // Simulation growth rate
       } else if (selector === 'growth-rate') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
@@ -1680,10 +1692,15 @@ const runCalculations = () => {
             optimalValues['growth-rate'] = i;
             break;
           }
+
+          // If last loop and the retirement was never successful
+          if (i >= maxRange) optimalValues['growth-rate'] = maxRange;
         }
         optimalValues['growth-rate-reversed'] = false;
+
+        // Simulation retirement-income
       } else if (selector === 'retirement-income') {
-        for (let i = minRange; i <= maxRange; i += step) {
+        for (let i = minRange; i <= maxRange; i += step * 2) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
 
           const annualCashExpensesL = getAnnualSavingsOrExpenses(
@@ -1780,8 +1797,10 @@ const runCalculations = () => {
           }
         }
         optimalValues['retirement-income-reversed'] = false;
+
+        // Simulation retirement expenses
       } else if (selector === 'retirement-expenses') {
-        for (let i = minRange; i <= maxRange; i += step) {
+        for (let i = minRange; i <= maxRange; i += step * 2) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
 
           const annualCashExpensesL = getAnnualSavingsOrExpenses(i, yearOfRetirementL, inputValues['expectancy'], true, false);
@@ -1876,8 +1895,13 @@ const runCalculations = () => {
             optimalValues['retirement-expenses'] = i - 1;
             break;
           }
+
+          // If last loop and the retirement never failed
+          if (i >= maxRange) optimalValues['retirement-expenses'] = maxRange;
         }
         optimalValues['retirement-expenses-reversed'] = true;
+
+        // Simulation capital gains
       } else if (selector === 'capital-gains') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
@@ -1981,8 +2005,13 @@ const runCalculations = () => {
             optimalValues['capital-gains'] = i - 1;
             break;
           }
+
+          // If last loop and the retirement never failed
+          if (i >= maxRange) optimalValues['capital-gains'] = maxRange;
         }
         optimalValues['capital-gains-reversed'] = true;
+
+        // Simulation inflation rate
       } else if (selector === 'inflation-rate') {
         for (let i = minRange; i <= maxRange; i += step) {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
@@ -2101,15 +2130,18 @@ const runCalculations = () => {
             optimalValues['inflation-rate'] = i - 1;
             break;
           }
+
+          // If last loop and the retirement never failed
+          if (i >= maxRange) optimalValues['inflation-rate'] = maxRange;
         }
         optimalValues['inflation-rate-reversed'] = true;
       }
     });
     // console.log('Optimal values:', optimalValues);
   };
-  const runSimulation = throttle(_runSimulation, 0);
+  const runSimulation = _.throttle(_runSimulation, 100, { trailing: true });
 
-  runSimulation(projectedPortfolioAtDeath);
+  runSimulation();
 
   //------------------ End of Simulation
 
