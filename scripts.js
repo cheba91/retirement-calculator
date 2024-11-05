@@ -391,6 +391,8 @@ document.addEventListener('DOMContentLoaded', () => {
   sidebarElements.annualBudget = document.querySelector('#res-budget-year');
   sidebarElements.yearsOfWithdrawals = document.querySelector('#res-years-of-withdrawals');
   sidebarElements.portfolioAtDeath = document.querySelector('#res-portfolio-at-death');
+  sidebarElements.successMessage = document.querySelector('.notification[notification="success"]');
+  sidebarElements.errorMessage = document.querySelector('.notification[notification="fail"]');
 });
 
 const runCalculations = () => {
@@ -531,7 +533,7 @@ const runCalculations = () => {
         '₿' +
         formatCurrency(
           getBtcBalanceAtRetirement(btcBalance, currentYear + (inputValues['retirement-age'] - currentAge)) / btcPriceAtRetirement,
-          8
+          3
         ).replace('$', ''));
     sidebarElements.btcPriceAtRetirement && (sidebarElements.btcPriceAtRetirement.value = formatCurrency(btcPriceAtRetirement));
     sidebarElements.monthlyBudget && (sidebarElements.monthlyBudget.value = formatCurrency(annualBudgetAtRetirement / 12));
@@ -546,6 +548,13 @@ const runCalculations = () => {
         1
       ));
     sidebarElements.portfolioAtDeath && (sidebarElements.portfolioAtDeath.value = formatCurrency(projectedPortfolioAtDeath));
+    if (projectedPortfolioAtDeath <= 0) {
+      sidebarElements.successMessage.classList.add('hidden');
+      sidebarElements.errorMessage.classList.remove('hidden');
+    } else {
+      sidebarElements.successMessage.classList.remove('hidden');
+      sidebarElements.errorMessage.classList.add('hidden');
+    }
   };
 
   //------------------ Asset total balance, all individual balances and all sold balances
