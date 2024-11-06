@@ -24,12 +24,13 @@ const inputValues = {
 const onlyNumbers = (value) => +String(value).replace(/\D/g, '');
 const formatPercent = (value) => `${value}%`;
 const formatToFixed = (value, decimals = 0) => +value.toFixed(decimals);
-const formatCurrencyShort = (value, decimal = 0) => {
-  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-  else if (value >= 1000000) return `$${(value / 1000000).toFixed(decimal)}M`;
-  else if (value >= 1000) return `$${(value / 1000).toFixed()}K`;
-  else return `$${value}`;
-};
+  const formatCurrencyShort = (value, decimal = 0) => {
+    if (value >= 1000000000000) return `$${(value / 1000000000000).toFixed(1)}T`;
+    else if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+    else if (value >= 1000000) return `$${(value / 1000000).toFixed(decimal)}M`;
+    else if (value >= 1000) return `$${(value / 1000).toFixed()}K`;
+    else return `$${value}`;
+  };
 const formatCurrency = (value, decimals = 0) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
