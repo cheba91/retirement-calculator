@@ -76,7 +76,7 @@ const updateRangeSliderScale = (value, currentValue, minValue, maxValue, optimal
 };
 
 const updateAllRangesliders = () => {
-  console.log(optimalValues);
+ // console.log(optimalValues);
   // Update all range sliders
   calcElementsAndRanges.forEach((element) => {
     const { selector, slider, min, max, step } = element;
