@@ -1,6 +1,6 @@
 //------------------- Range sliders charting -------------------//
 const chartHeight = 32;
-const fixedBarCount = 49;
+let fixedBarCount = 49;
 const optimalValues = {};
 const calcSelectors = [
   'retirement-age',
@@ -24,13 +24,13 @@ const inputValues = {
 const onlyNumbers = (value) => +String(value).replace(/\D/g, '');
 const formatPercent = (value) => `${value}%`;
 const formatToFixed = (value, decimals = 0) => +value.toFixed(decimals);
-  const formatCurrencyShort = (value, decimal = 0) => {
-    if (value >= 1000000000000) return `$${(value / 1000000000000).toFixed(1)}T`;
-    else if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-    else if (value >= 1000000) return `$${(value / 1000000).toFixed(decimal)}M`;
-    else if (value >= 1000) return `$${(value / 1000).toFixed()}K`;
-    else return `$${value}`;
-  };
+const formatCurrencyShort = (value, decimal = 0) => {
+  if (value >= 1000000000000) return `$${(value / 1000000000000).toFixed(1)}T`;
+  else if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+  else if (value >= 1000000) return `$${(value / 1000000).toFixed(decimal)}M`;
+  else if (value >= 1000) return `$${(value / 1000).toFixed()}K`;
+  else return `$${value}`;
+};
 const formatCurrency = (value, decimals = 0) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -76,7 +76,7 @@ const updateRangeSliderScale = (value, currentValue, minValue, maxValue, optimal
 };
 
 const updateAllRangesliders = () => {
- // console.log(optimalValues);
+  // console.log(optimalValues);
   // Update all range sliders
   calcElementsAndRanges.forEach((element) => {
     const { selector, slider, min, max, step } = element;
@@ -134,7 +134,7 @@ const initRangeSliders = () => {
     }
 
     let chartWidth = graphContainer.clientWidth;
-    const gap = 4;
+    const gap = window.innerWidth < 768 ? 3 : 4;
 
     const graph = d3.select(graphContainer).append('svg').attr('width', chartWidth).attr('height', chartHeight);
 
@@ -175,11 +175,11 @@ const initRangeSliders = () => {
 
     const updateBars = () => {
       const currentValue = +slider.value;
-      bars.attr('fill', (d, i) => {
-        // const value = minValue + (maxValue - minValue) * (i / (fixedBarCount - 1));
-        // return updateRangeSliderScale(value, currentValue, minValue, maxValue, optimalValues[selector], optimalValues[`${selector}-reversed`], i);
-        // return updateRangeSliderScale(value, currentValue, minValue, maxValue, i);
-      });
+      // bars.attr('fill', (d, i) => {
+      // const value = minValue + (maxValue - minValue) * (i / (fixedBarCount - 1));
+      // return updateRangeSliderScale(value, currentValue, minValue, maxValue, optimalValues[selector], optimalValues[`${selector}-reversed`], i);
+      // return updateRangeSliderScale(value, currentValue, minValue, maxValue, i);
+      // });
       updateAllRangesliders();
       updateHandle(selector, currentValue);
     };
@@ -235,6 +235,7 @@ const initRangeSliders = () => {
 
 //------------------- Initialize -------------------//
 window.addEventListener('load', () => {
+  if (window.innerWidth < 768) fixedBarCount = 35;
   initRangeSliders();
 
   // Range sliders
@@ -267,7 +268,13 @@ window.addEventListener('load', () => {
       if (value < minAge) value = minAge;
       input.value = value;
       inputValues[input.id] = value;
-      runCalculations();
+
+      const rangeInput = input.closest('.calc-range__wrap')?.querySelector('.calc__slider-range');
+      if (rangeInput) {
+        rangeInput.value = value;
+        rangeInput.dispatchEvent(new Event('input'));
+      } else runCalculations();
+
       console.log(input.id, 'input value: ', input.value, 'max age: ', maxAge, 'min age:', minAge, 'used value: ', value);
     });
   });
@@ -277,13 +284,20 @@ window.addEventListener('load', () => {
   percentInputs.forEach((input) => {
     const maxPercent = +input.getAttribute('max-percent');
     const minPercent = +input.getAttribute('min-percent');
+
     input.addEventListener('blur', () => {
       let value = onlyNumbers(input.value);
       if (value > maxPercent) value = maxPercent;
       if (value < minPercent) value = minPercent;
       input.value = formatPercent(value);
       inputValues[input.id] = value / 100;
-      runCalculations();
+
+      const rangeInput = input.closest('.calc-range__wrap')?.querySelector('.calc__slider-range');
+      if (rangeInput) {
+        rangeInput.value = value;
+        rangeInput.dispatchEvent(new Event('input'));
+      } else runCalculations();
+
       console.log(input.id, 'input value: ', input.value, 'only numbers: ', onlyNumbers(input.value), 'used value: ', value / 100);
     });
   });
@@ -293,13 +307,20 @@ window.addEventListener('load', () => {
   currencyInputs.forEach((input) => {
     const maxUsd = +input.getAttribute('max-usd');
     const minUsd = +input.getAttribute('min-usd');
+
     input.addEventListener('blur', () => {
       let value = onlyNumbers(input.value);
       if (value > maxUsd) value = maxUsd;
       if (value < minUsd) value = minUsd;
       input.value = formatCurrency(value);
       inputValues[input.id] = value;
-      runCalculations();
+
+      const rangeInput = input.closest('.calc-range__wrap')?.querySelector('.calc__slider-range');
+      if (rangeInput) {
+        rangeInput.value = value;
+        rangeInput.dispatchEvent(new Event('input'));
+      } else runCalculations();
+
       console.log(input.id, 'input value: ', input.value, 'only numbers: ', onlyNumbers(input.value), 'used value: ', value);
     });
   });
@@ -309,6 +330,8 @@ window.addEventListener('load', () => {
     radio.addEventListener('change', () => {
       inputValues[radio.name] = radio.value;
       runCalculations();
+      console.log(radio.name, 'radio value: ', radio.value);
+      // document.querySelector("input[type='range']").dispatchEvent(new Event('input'));
     });
   });
 
@@ -343,12 +366,13 @@ window.addEventListener('load', () => {
 //------------------ Calculations ------------------//
 //------------------ S2F Model prices
 // prettier-ignore
-const btcPricesS2F = {2023: 83667.67557239954,2024: 686398.0127483337,2025: 703741.9524243205,2026: 721375.6236071566,2027: 739301.4262968419,2028: 5986997.015654025,2029: 6060174.083947013,2030: 6133945.0152537,2031: 6208312.209574085,2032: 49965761.24291532,2033: 50266224.53526536,2034: 50567889.953642786,2035: 50870759.89804761,2036: 408181178.5400824,2037: 409398694.1478387,2038: 410618628.40764976,2039: 411840983.7195157,2040: 3299624560.159754,2041: 3304526099.867491,2042: 3309432491.2793384,2043: 3314343736.795295,2044: 26534409444.738514,2045: 26554078710.52289,2046: 26573757694.115482,2047: 26593446397.916298,2048: 212826355165.1583,2049: 212905158594.60263,2050: 212983981474.06342,2051: 213062823805.94064,2052: 1704818018138.2832,2053: 1705133484741.0745,2054: 1705448990258.2983,2055: 1705764534692.3552,2056: 13647378572031.568,2057: 13648640944365.16,2058: 13649903394542.018,2059: 13651165922564.541,2060: 109214377726149.42,2061: 109219428227481.05,2062: 109224478884513.6,2063: 109229529697249.48,2064: 873856441296055.4,2065: 873876645325528.8,2066: 873896849666418.5,2067: 873917054318726.8,2068: 6991417254093309,2069: 6991498074259649,2070: 6991578895048836,2071: 6991659716460872,2072: 55933601019203670,2073: 55933924307966080,2074: 55934247597974184,2075: 55934570889228010,2076: 447477860282576500,2077: 447479153453820400,2078: 447480446627555650,2079: 447481739803782400,2080: 3579859091142640000,2081: 3579864263860004400,2082: 3579869436582351400,2083: 3579874609309681000,2084: 28639017565401715000,2085: 28639038256335950000,2086: 28639058947280150000,2087: 28639079638234317000,2088: 229112719869721100000,2089: 229112802633587600000,2090: 229112885397474000000,2091: 229112968161380340000,2092: 1.832904076346728e21,2093: 1.832904407402453e21,2094: 1.832904738458218e21,2095: 1.832905069514023e21,2096: 1.4663241880335521e22,2097: 1.4663243204558938e22,2098: 1.4663244528782437e22,2099: 1.4663245853006015e22,2100: 1.1730597212094267e23,2101: 1.1730597741783739e23,2102: 1.1730598271473226e23,2103: 1.173059880116273e23,2104: 9.384479252805988e23,2105: 9.384479464681798e23,2106: 9.38447967655761e23,2107: 9.384479888433425e23,2108: 7.507583995497068e24,2109: 7.507584080247396e24,2110: 7.507584164997724e24,2111: 7.507584249748053e24,2112: 6.006067433698574e25,2113: 6.0060674675987065e25,2114: 6.006067501498839e25,2115: 6.006067535398971e25,2116: 4.8048540418792296e26,2117: 4.8048540554392825e26,2118: 4.804854068999335e26,2119: 4.804854082559388e26,2120: 3.8438832714715317e27,2121: 3.843883276895553e27,2122: 3.8438832823195746e27,2123: 3.843883287743595e27,2124: 3.075106632364485e28,
-   };
+const btcPricesS2F = {2023:83667.67557239954,2024:686398.0127483337,2025:703741.9524243205,2026:721375.6236071566,2027:739301.4262968419,2028:5986997.015654025,2029:6060174.083947013,2030:6133945.0152537,2031:6208312.209574085,2032:49965761.24291532,2033:50266224.53526536,2034:50567889.953642786,2035:50870759.89804761,2036:408181178.5400824,2037:409398694.1478387,2038:410618628.40764976,2039:411840983.7195157,2040:3299624560.159754,2041:3304526099.867491,2042:3309432491.2793384,2043:3314343736.795295,2044:26534409444.738514,2045:26554078710.52289,2046:26573757694.115482,2047:26593446397.916298,2048:212826355165.1583,2049:212905158594.60263,2050:212983981474.06342,2051:213062823805.94064,2052:1704818018138.2832,2053:1705133484741.0745,2054:1705448990258.2983,2055:1705764534692.3552,2056:13647378572031.568,2057:13648640944365.16,2058:13649903394542.018,2059:13651165922564.541,2060:109214377726149.42,2061:109219428227481.05,2062:109224478884513.6,2063:109229529697249.48,2064:873856441296055.4,2065:873876645325528.8,2066:873896849666418.5,2067:873917054318726.8,2068:6991417254093309,2069:6991498074259649,2070:6991578895048836,2071:6991659716460872,2072:55933601019203670,2073:55933924307966080,2074:55934247597974184,2075:55934570889228010,2076:447477860282576500,2077:447479153453820400,2078:447480446627555650,2079:447481739803782400,2080:3579859091142640000,2081:3579864263860004400,2082:3579869436582351400,2083:3579874609309681000,2084:28639017565401715000,2085:28639038256335950000,2086:28639058947280150000,2087:28639079638234317000,2088:229112719869721100000,2089:229112802633587600000,2090:229112885397474000000,2091:229112968161380340000,2092:1.832904076346728e21,2093:1.832904407402453e21,2094:1.832904738458218e21,2095:1.832905069514023e21,2096:1.4663241880335521e22,2097:1.4663243204558938e22,2098:1.4663244528782437e22,2099:1.4663245853006015e22,2100:1.1730597212094267e23,2101:1.1730597741783739e23,2102:1.1730598271473226e23,2103:1.173059880116273e23,2104:9.384479252805988e23,2105:9.384479464681798e23,2106:9.38447967655761e23,2107:9.384479888433425e23,2108:7.507583995497068e24,2109:7.507584080247396e24,2110:7.507584164997724e24,2111:7.507584249748053e24,2112:6.006067433698574e25,2113:6.0060674675987065e25,2114:6.006067501498839e25,2115:6.006067535398971e25,2116:4.8048540418792296e26,2117:4.8048540554392825e26,2118:4.804854068999335e26,2119:4.804854082559388e26,2120:3.8438832714715317e27,2121:3.843883276895553e27,2122:3.8438832823195746e27,2123:3.843883287743595e27,2124:3.075106632364485e28,2125:3.075106634586495e28,2126:3.075106636808505e28,2127:3.075106639030515e28,2128:2.460085306062612e29,2129:2.460085306646612e29,2130:2.460085307230612e29,2131:2.460085307814612e29,2132:1.9680682457644896e30,2133:1.9680682458004896e30,2134:1.9680682458364896e30,2135:1.9680682458724896e30,2136:1.5744545966091917e31,2137:1.5744545966101917e31,2138:1.5744545966111917e31,2139:1.5744545966121917e31,2140:1.2595636772888455e32,2141:1.2595636772889455e32,2142:1.2595636772890455e32,2143:1.2595636772891455e32,2144:1.0076509418312764e33,2145:1.0076509418312864e33,2146:1.0076509418312964e33,2147:1.0076509418313064e33,2148:8.06120753465051e33,2149:8.06120753465052e33,2150:8.06120753465053e33,
+};
 
 //---------------- Power law
 // prettier-ignore
-const btcPricesPowerLaw={2010:.03010628391340072,2011:1.1665179071089278,2012:9.907153518999726,2013:45.19867119834384,2014:146.69756182579547,2015:383.8690959546252,2016:865.7538110434199,2017:1751.2974860018503,2018:3260.172897171796,2019:5684.040358193767,2020:9398.205992247365,2021:14873.644841217618,2022:22689.361763417706,2023:33545.06742296482,2024:48274.150009732526,2025:67856.9259484952,2026:93434.15495479168,2027:126320.80650542538,2028:168020.06620561847,2029:220237.57171875774,2030:284895.86892683443,2031:364149.07984625496,2032:460397.7745621203,2033:576304.0400856528,2034:714806.7396007673,2035:879136.956059804,2036:1072833.6145261182,2037:1299759.2780504897,2038:1564116.11221663,2039:1870462.0138040376,2040:2223726.899298489,2041:2629229.1492358693,2042:3092692.20459768,2043:3620261.3116871836,2044:4218520.412109992,2045:4894509.174658779,2046:5655740.166065894,2047:6510216.157738416,2048:7466447.56572719,2049:8533470.021312093,2050:9720862.069704706,2051:11038762.99447847,2052:12497890.765443347,2053:14109560.10777605,2054:15885700.690305535,2055:17838875.430944793,2056:19982298.91732885,2057:22329855.9408026,2058:24896120.141967528,2059:27696372.76606204,2060:30746621.526514836,2061:34063619.575065486,2062:37664884.57690828,2063:41568717.88935906,2064:45794223.84260448,2065:50361329.121127106,2066:55290802.24446532,2067:60604273.145984486,2068:66324252.848392956,2069:72474153.23477471,2070:79078306.9139389,2071:86161987.17892468,2072:93751428.05753744,2073:101873844.45382282,2074:110557452.37940992,2075:119831489.27368927,2076:129726234.41182208,2077:140273029.3995864,2078:151504298.75413832,2079:163453570.5697123,2080:176155497.2673918,2081:189645876.42804408,2082:203961671.7075677,2083:219141033.83361897,2084:235223321.68296367,2085:252249123.43869257,2086:270260277.82650423,2087:289299895.4292663,2088:309412380.07914644,2089:330643450.3265579,2090:353040160.9852152,2091:376650924.7525929,2092:401525533.90509224,2093:427715182.06731635,2094:455272486.0546629,2095:484251507.78876597,2096:514707776.2849914,2097:546698309.7114946,2098:580281637.519149,2099:615517822.6418598,2100:652468483.7665489,2101:691196817.6723416,2102:731767621.6383815,2103:774247315.91971,2104:818703966.2906268,2105:865207306.6551566,2106:913828761.7238742,2107:964641469.7568666,2108:1017720305.3720078,2109:1073141902.4184024,2110:1130984676.914149,2111:1191328850.0483358,2112:1254256471.2464457,2113:1319851441.2990417,2114:1388199535.5529408,2115:1459388427.1647863,2116:1533507710.416309,2117:1610648924.0909843,2118:1690905574.9117064,2119:1774373161.0388107,2120:1861149195.6284683,2121:1951333230.450664,2122:2045026879.5664902,2123:2142333843.06452,2124:2243359930.8555956};
+const btcPricesPowerLaw={2010:0.03010628391340072,2011:1.1665179071089278,2012:9.907153518999726,2013:45.19867119834384,2014:146.69756182579547,2015:383.8690959546252,2016:865.7538110434199,2017:1751.2974860018503,2018:3260.172897171796,2019:5684.040358193767,2020:9398.205992247365,2021:14873.644841217618,2022:22689.361763417706,2023:33545.06742296482,2024:48274.150009732526,2025:67856.9259484952,2026:93434.15495479168,2027:126320.80650542538,2028:168020.06620561847,2029:220237.57171875774,2030:284895.86892683443,2031:364149.07984625496,2032:460397.7745621203,2033:576304.0400856528,2034:714806.7396007673,2035:879136.956059804,2036:1072833.6145261182,2037:1299759.2780504897,2038:1564116.11221663,2039:1870462.0138040376,2040:2223726.899298489,2041:2629229.1492358693,2042:3092692.20459768,2043:3620261.3116871836,2044:4218520.412109992,2045:4894509.174658779,2046:5655740.166065894,2047:6510216.157738416,2048:7466447.56572719,2049:8533470.021312093,2050:9720862.069704706,2051:11038762.99447847,2052:12497890.765443347,2053:14109560.10777605,2054:15885700.690305535,2055:17838875.430944793,2056:19982298.91732885,2057:22329855.9408026,2058:24896120.141967528,2059:27696372.76606204,2060:30746621.526514836,2061:34063619.575065486,2062:37664884.57690828,2063:41568717.88935906,2064:45794223.84260448,2065:50361329.121127106,2066:55290802.24446532,2067:60604273.145984486,2068:66324252.848392956,2069:72474153.23477471,2070:79078306.9139389,2071:86161987.17892468,2072:93751428.05753744,2073:101873844.45382282,2074:110557452.37940992,2075:119831489.27368927,2076:129726234.41182208,2077:140273029.3995864,2078:151504298.75413832,2079:163453570.5697123,2080:176155497.2673918,2081:189645876.42804408,2082:203961671.7075677,2083:219141033.83361897,2084:235223321.68296367,2085:252249123.43869257,2086:270260277.82650423,2087:289299895.4292663,2088:309412380.07914644,2089:330643450.3265579,2090:353040160.9852152,2091:376650924.7525929,2092:401525533.90509224,2093:427715182.06731635,2094:455272486.0546629,2095:484251507.78876597,2096:514707776.2849914,2097:546698309.7114946,2098:580281637.519149,2099:615517822.6418598,2100:652468483.7665489,2101:691196817.6723416,2102:731767621.6383815,2103:774247315.91971,2104:818703966.2906268,2105:865207306.6551566,2106:913828761.7238742,2107:964641469.7568666,2108:1017720305.3720078,2109:1073141902.4184024,2110:1130984676.914149,2111:1191328850.0483358,2112:1254256471.2464457,2113:1319851441.2990417,2114:1388199535.5529408,2115:1459388427.1647863,2116:1533507710.416309,2117:1610648924.0909843,2118:1690905574.9117064,2119:1774373161.0388107,2120:1861149195.6284683,2121:1951333230.450664,2122:2045026879.5664902,2123:2142333843.06452,/**/2124:2243359930.8555956,2125:2348213187.2468762,2126:2457003848.429197,2127:2569844421.318914,2128:2686849762.5737424,2129:2808137152.919356,2130:2933826241.2336226,2131:3064039183.7189164,2132:3198900557.6991563,2133:3338537479.274699,2134:3483079594.9370136,2135:3632659358.393442,2136:3787412122.3454347,2137:3947476186.1085377,2138:4112982582.5432158,2139:4284065241.7017865,2140:4460850714.863287,2141:4643468531.0255375,2142:4832041129.041158,2143:5026693943.046582,2144:5227555547.292991,2145:5434757559.012363,2146:5648434824.287295,2147:5868725423.872905,2148:6095760671.162726,2149:6329675264.029956,2150:6570607324.946248,
+};
 
 // Constants
 const currentYear = new Date().getFullYear();
@@ -362,7 +386,7 @@ const btcPricesBtc24 = (() => {
   const percentDecrement = 2.5;
   const prices = { [startYear]: currentBtcPrice };
 
-  for (let i = 1; i <= 100; i++) {
+  for (let i = 1; i <= 121; i++) {
     const percent = Math.max(startingPercent - (i - 1) * percentDecrement, minPercent);
     const previousPrice = prices[startYear + (i - 1)];
     const currentYear = startYear + i;
@@ -394,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
   sidebarElements.portfolioAtDeath = document.querySelector('#res-portfolio-at-death');
   sidebarElements.successMessage = document.querySelector('.notification[notification="success"]');
   sidebarElements.errorMessage = document.querySelector('.notification[notification="fail"]');
+  sidebarElements.mobileUnderline = document.querySelector('.calc-mobile__underline');
 });
 
 const runCalculations = () => {
@@ -401,6 +426,8 @@ const runCalculations = () => {
   // prettier-ignore
   const requiredInputs = ['btc-price','current-age-i','balance-stocks','balance-bonds','balance-btc','balance-other','additional-stocks','additional-bonds','additional-btc','additional-other','retirement-age','expectancy','expected-stocks','expected-bonds','expected-cash','expected-btc','growth-rate','retirement-income','retirement-expenses','capital-gains','inflation-rate','plan-type','btc-account',/*'retirement-strategy-sell', 'retirement-strategy-order', */
    ];
+
+  console.log('Run calcs');
 
   const missingInputs = requiredInputs.filter((input) => !inputValues[input] && inputValues[input] !== 0);
   if (missingInputs.length > 0) {
@@ -410,10 +437,6 @@ const runCalculations = () => {
   }
 
   const currentAge = inputValues['current-age-i'];
-  // const retirementAge = inputValues['retirement-age'];
-  // const yearOfRetirement = currentYear + (inputValues['retirement-age'] - currentAge);
-  // const expectancy = inputValues['expectancy'];
-  // const yearOfDeath = currentYear - currentAge + inputValues['expectancy'];
 
   //------------------ Projected portfolio at retirement
   const getProjectedPortfolioAtRetirement = (totalBalances, yearOfRetirement) => totalBalances[yearOfRetirement];
@@ -477,9 +500,14 @@ const runCalculations = () => {
     const withdrawalsNeeded = {};
     for (let i = 1; i <= expectancy; i++) {
       const localCurrentYear = currentYear + i;
+      // Get user age in local year
+      const localAge = currentAge + i;
+      // Capital gains tax doesn't apply until year 60
+      const formattedCapitalGains = localAge >= 60 ? 0 : capitalGains;
       if (localCurrentYear > yearOfRetirement) {
         let withdrawal;
-        if (accountType === 'none') withdrawal = expenses[localCurrentYear] / (1 - capitalGains / 100);
+        if (accountType === 'none') withdrawal = expenses[localCurrentYear] / (1 - formattedCapitalGains / 100);
+        // if (accountType === 'none') withdrawal = expenses[localCurrentYear] / (1 - capitalGains / 100);
         else withdrawal = expenses[localCurrentYear];
 
         withdrawalsNeeded[localCurrentYear] = withdrawal;
@@ -489,18 +517,18 @@ const runCalculations = () => {
   };
 
   //------------------ Withdrawals taxes paid
-  const getWithdrawalsTaxesPaid = (withdrawalsNeeded, expectancy, yearOfRetirement, capitalGains = inputValues['capital-gains']) => {
-    const withdrawalsTaxesPaid = {};
-    for (let i = 1; i <= expectancy; i++) {
-      const localCurrentYear = currentYear + i;
-      if (localCurrentYear >= yearOfRetirement) {
-        const withdrawal = withdrawalsNeeded[localCurrentYear];
-        const taxesPaid = (withdrawal * capitalGains) / 100;
-        withdrawalsTaxesPaid[localCurrentYear] = taxesPaid;
-      } else withdrawalsTaxesPaid[localCurrentYear] = 0;
-    }
-    return withdrawalsTaxesPaid;
-  };
+  // const getWithdrawalsTaxesPaid = (withdrawalsNeeded, expectancy, yearOfRetirement, capitalGains = inputValues['capital-gains']) => {
+  //   const withdrawalsTaxesPaid = {};
+  //   for (let i = 1; i <= expectancy; i++) {
+  //     const localCurrentYear = currentYear + i;
+  //     if (localCurrentYear >= yearOfRetirement) {
+  //       const withdrawal = withdrawalsNeeded[localCurrentYear];
+  //       const taxesPaid = (withdrawal * capitalGains) / 100;
+  //       withdrawalsTaxesPaid[localCurrentYear] = taxesPaid;
+  //     } else withdrawalsTaxesPaid[localCurrentYear] = 0;
+  //   }
+  //   return withdrawalsTaxesPaid;
+  // };
 
   //------------------ Cash balances
   const getCashBalances = (annualCashSavings, expectancy) => {
@@ -518,7 +546,7 @@ const runCalculations = () => {
   };
   //------------------ Update sidebar Results
   const updateSidebarResults = (
-    totalBalances,
+    currentAge,
     btcBalance,
     btcPrices,
     annualBudgetAtRetirement,
@@ -526,38 +554,41 @@ const runCalculations = () => {
     projectedPortfolioAtDeath,
     projectedPortfolioAtRetirement
   ) => {
-    const btcPriceAtRetirement = getBitcoinPriceAtRetirement(btcPrices, currentYear + (inputValues['retirement-age'] - currentAge));
-    sidebarElements.retireBy && (sidebarElements.retireBy.value = inputValues['retirement-age']);
-    sidebarElements.portfolioAtRetirement && (sidebarElements.portfolioAtRetirement.value = formatCurrency(projectedPortfolioAtRetirement));
-    sidebarElements.btcAtRetirement &&
-      (sidebarElements.btcAtRetirement.value =
-        '₿' +
-        formatCurrency(
-          getBtcBalanceAtRetirement(btcBalance, currentYear + (inputValues['retirement-age'] - currentAge)) / btcPriceAtRetirement,
-          3
-        ).replace('$', ''));
-    sidebarElements.btcPriceAtRetirement && (sidebarElements.btcPriceAtRetirement.value = formatCurrency(btcPriceAtRetirement));
-    sidebarElements.monthlyBudget && (sidebarElements.monthlyBudget.value = formatCurrency(annualBudgetAtRetirement / 12));
-    sidebarElements.annualBudget && (sidebarElements.annualBudget.value = formatCurrency(annualBudgetAtRetirement));
-    sidebarElements.yearsOfWithdrawals &&
-      (sidebarElements.yearsOfWithdrawals.value = formatToFixed(
-        getYearsOfSustainableWithdrawals(
-          retirementSuccessStatus,
-          currentYear + (inputValues['retirement-age'] - currentAge),
-          currentYear - currentAge + inputValues['expectancy']
-        ),
-        1
-      ));
-    sidebarElements.portfolioAtDeath && (sidebarElements.portfolioAtDeath.value = formatCurrency(projectedPortfolioAtDeath));
-    if (projectedPortfolioAtDeath <= 0) {
-      sidebarElements.successMessage.classList.add('hidden');
-      sidebarElements.errorMessage.classList.remove('hidden');
-    } else {
-      sidebarElements.successMessage.classList.remove('hidden');
-      sidebarElements.errorMessage.classList.add('hidden');
-    }
+    setTimeout(() => {
+      const btcPriceAtRetirement = getBitcoinPriceAtRetirement(btcPrices, currentYear + (inputValues['retirement-age'] - currentAge));
+      sidebarElements.retireBy && (sidebarElements.retireBy.value = inputValues['retirement-age']);
+      sidebarElements.portfolioAtRetirement && (sidebarElements.portfolioAtRetirement.value = formatCurrency(projectedPortfolioAtRetirement));
+      sidebarElements.btcAtRetirement &&
+        (sidebarElements.btcAtRetirement.value =
+          '₿' +
+          formatCurrency(
+            getBtcBalanceAtRetirement(btcBalance, currentYear + (inputValues['retirement-age'] - currentAge)) / btcPriceAtRetirement,
+            3
+          ).replace('$', ''));
+      sidebarElements.btcPriceAtRetirement && (sidebarElements.btcPriceAtRetirement.value = formatCurrency(btcPriceAtRetirement));
+      sidebarElements.monthlyBudget && (sidebarElements.monthlyBudget.value = formatCurrency(annualBudgetAtRetirement / 12));
+      sidebarElements.annualBudget && (sidebarElements.annualBudget.value = formatCurrency(annualBudgetAtRetirement));
+      sidebarElements.yearsOfWithdrawals &&
+        (sidebarElements.yearsOfWithdrawals.value = formatToFixed(
+          getYearsOfSustainableWithdrawals(
+            retirementSuccessStatus,
+            currentYear + (inputValues['retirement-age'] - currentAge),
+            currentYear - currentAge + inputValues['expectancy']
+          ),
+          1
+        ));
+      sidebarElements.portfolioAtDeath && (sidebarElements.portfolioAtDeath.value = formatCurrency(projectedPortfolioAtDeath));
+      if (projectedPortfolioAtDeath <= 0) {
+        sidebarElements.successMessage.classList.add('hidden');
+        sidebarElements.errorMessage.classList.remove('hidden');
+        sidebarElements.mobileUnderline.classList.remove('is--green');
+      } else {
+        sidebarElements.successMessage.classList.remove('hidden');
+        sidebarElements.errorMessage.classList.add('hidden');
+        sidebarElements.mobileUnderline.classList.add('is--green');
+      }
+    }, 50);
   };
-
   //------------------ Asset total balance, all individual balances and all sold balances
   const getAllBalancesAndSold = (
     withdrawalsNeeded,
@@ -571,7 +602,8 @@ const runCalculations = () => {
     expectedStocksGrowthRate,
     expectedBondsGrowthRate,
     expectedCashGrowthRate,
-    expectedBtcGrowthRate
+    expectedBtcGrowthRate,
+    logResults = false
   ) => {
     const totalBalances = {};
     const btcBalance = {};
@@ -615,6 +647,7 @@ const runCalculations = () => {
       let yearStocksSold = 0;
       let yearBondsSold = 0;
       const netWithdrawal = withdrawalsNeeded[localCurrentYear] - otherIncome[localCurrentYear] || 0;
+      // const netWithdrawal = Math.max(withdrawalsNeeded[localCurrentYear] - otherIncome[localCurrentYear]);
 
       if (localCurrentYear > yearOfRetirement && previousTotalBalance > 0) {
         // Calculate the difference between needed withdrawals and other income
@@ -642,14 +675,6 @@ const runCalculations = () => {
               yearStocksSold = Math.min(yearStocksSold, previousStocksBalance);
               yearBondsSold = Math.min(yearBondsSold, previousBondsBalance);
             }
-          } else {
-            // If there's no previous balance, put any surplus into equal portions
-            // if (netWithdrawal < 0) {
-            //   yearBtcSold = netWithdrawal / 3;
-            //   yearStocksSold = netWithdrawal / 3;
-            //   yearBondsSold = netWithdrawal / 3;
-            // }
-            //
           }
         }
       }
@@ -748,19 +773,22 @@ const runCalculations = () => {
           },
         });
       }
-      // console.log(`Year ${localCurrentYear} - Total Balance: ${formatCurrency(totalBalances[localCurrentYear])}, Total withdrawal: ${formatCurrency(
-      //   netWithdrawal
-      // )} \n
-      //    BTC Balance: ${formatCurrency(btcBalance[localCurrentYear])}, withdrawal: ${formatCurrency(
-      //   btcSold[localCurrentYear],
-      //   2
-      // )}, price: ${formatCurrency(btcPrice)} \n
-      //    Stocks Balance: ${formatCurrency(stocksBalance[localCurrentYear])}, withdrawal: ${formatCurrency(stocksSold[localCurrentYear])} \n
-      //    Bonds Balance: ${formatCurrency(bondsBalance[localCurrentYear])}, withdrawal: ${formatCurrency(bondsSold[localCurrentYear])} \n
-      //    Cash Balance: ${formatCurrency(cashIncomeBalance[localCurrentYear])} \n
-      //    60/40 Portfolio: ${formatCurrency(portfolio60_40[localCurrentYear])} \n
-      //    Retirement Success: ${retirementSuccessStatus[localCurrentYear] ? 'Yes' : 'No'} \n
-      //      `);
+      if (logResults) {
+        console.log('Res', logResults);
+        console.log(`Year ${localCurrentYear},  Total Balance: ${formatCurrency(totalBalances[localCurrentYear])}, Total withdrawal: ${formatCurrency(
+          netWithdrawal
+        )} \n
+        BTC Balance: ${formatCurrency(btcBalance[localCurrentYear])}, withdrawal: ${formatCurrency(
+          btcSold[localCurrentYear],
+          2
+        )}, price: ${formatCurrency(btcPrice)} \n
+        Stocks Balance: ${formatCurrency(stocksBalance[localCurrentYear])}, withdrawal: ${formatCurrency(stocksSold[localCurrentYear])} \n
+        Bonds Balance: ${formatCurrency(bondsBalance[localCurrentYear])}, withdrawal: ${formatCurrency(bondsSold[localCurrentYear])} \n
+        Cash Balance: ${formatCurrency(cashIncomeBalance[localCurrentYear])} \n
+        60/40 Portfolio: ${formatCurrency(portfolio60_40[localCurrentYear])} \n
+        Retirement Success: ${retirementSuccessStatus[localCurrentYear] ? 'Yes' : 'No'} \n
+        `);
+      }
     }
 
     return {
@@ -880,7 +908,8 @@ const runCalculations = () => {
     inputValues['expected-stocks'],
     inputValues['expected-bonds'],
     inputValues['expected-cash'],
-    inputValues['expected-btc']
+    inputValues['expected-btc'],
+    false
   );
   // console.log('btcPrices', btcPrices);
 
@@ -932,11 +961,9 @@ const runCalculations = () => {
   const projectedPortfolioAtRetirement = getProjectedPortfolioAtRetirement(totalBalances, currentYear + (inputValues['retirement-age'] - currentAge));
 
   const projectedPortfolioAtDeath = getProjectedPortfolioAtDeath(totalBalances, currentYear - currentAge + inputValues['expectancy']);
-  console.log('Projected Portfolio at Death: ', formatCurrency(projectedPortfolioAtDeath));
 
   //------------------ Simulation
   const _runSimulation = () => {
-    // TODO: Handle if optimal value is not found. Set to either max or min
     calcElementsAndRanges.forEach((calc) => {
       const selector = calc.selector;
       const minRange = calc.min;
@@ -1927,7 +1954,8 @@ const runCalculations = () => {
             annualCashExpensesL,
             inputValues['btc-account'],
             yearOfRetirementL,
-            inputValues['expectancy']
+            inputValues['expectancy'],
+            i
           );
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
@@ -1978,8 +2006,7 @@ const runCalculations = () => {
             inputValues['expected-stocks'],
             inputValues['expected-bonds'],
             inputValues['expected-cash'],
-            inputValues['expected-btc'],
-            i
+            inputValues['expected-btc']
           );
 
           const portfolioAtDeathL = getProjectedPortfolioAtDeath(lastResultTestValue, currentYear - currentAge + inputValues['expectancy']);
@@ -2102,9 +2129,7 @@ const runCalculations = () => {
             inputValues['expected-stocks'],
             inputValues['expected-bonds'],
             inputValues['expected-cash'],
-            inputValues['expected-btc'],
-            inputValues['growth-rate'],
-            i
+            inputValues['expected-btc']
           );
 
           const portfolioAtDeathL = getProjectedPortfolioAtDeath(lastResultTestValue, currentYear - currentAge + inputValues['expectancy']);
@@ -2148,6 +2173,7 @@ const runCalculations = () => {
       }
     });
     // console.log('Optimal values:', optimalValues);
+    updateAllRangesliders();
   };
   const runSimulation = _.throttle(_runSimulation, 100, { trailing: true });
 
@@ -2156,7 +2182,7 @@ const runCalculations = () => {
   //------------------ End of Simulation
 
   updateSidebarResults(
-    totalBalances,
+    currentAge,
     btcBalance,
     btcPrices,
     annualBudgetAtRetirement,
@@ -2164,7 +2190,6 @@ const runCalculations = () => {
     projectedPortfolioAtDeath,
     projectedPortfolioAtRetirement
   );
-
+  // updateAllRangesliders();
   updateMainChart(totalBalances, currentYear - currentAge + inputValues['expectancy'], currentAge, portfolio60_40, totalBalancesRoth);
-  // runSimulation();
 };
