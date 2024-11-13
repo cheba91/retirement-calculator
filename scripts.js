@@ -427,8 +427,6 @@ const runCalculations = () => {
   const requiredInputs = ['btc-price','current-age-i','balance-stocks','balance-bonds','balance-btc','balance-other','additional-stocks','additional-bonds','additional-btc','additional-other','retirement-age','expectancy','expected-stocks','expected-bonds','expected-cash','expected-btc','growth-rate','retirement-income','retirement-expenses','capital-gains','inflation-rate','plan-type','btc-account',/*'retirement-strategy-sell', 'retirement-strategy-order', */
    ];
 
-  console.log('Run calcs');
-
   const missingInputs = requiredInputs.filter((input) => !inputValues[input] && inputValues[input] !== 0);
   if (missingInputs.length > 0) {
     // console.log(`Missing input values: ${missingInputs.join(', ')}`);
@@ -2192,4 +2190,340 @@ const runCalculations = () => {
   );
   // updateAllRangesliders();
   updateMainChart(totalBalances, currentYear - currentAge + inputValues['expectancy'], currentAge, portfolio60_40, totalBalancesRoth);
+};
+
+//------------------ Main and sidebar chart ------------------
+let chartInited = false;
+let chart;
+let overviewChart;
+let chartElements = {};
+
+const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40, totalBalancesRoth) => {
+  if (!chartInited) {
+    chartElements.resultsWrap = document.querySelector('.chart-wrap .chart-info');
+    chartElements.resultAge = document.querySelector('#chart-res-age');
+    chartElements.resultBtc = document.querySelector('#chart-res-btc');
+    chartElements.result60_40 = document.querySelector('#chart-res-6040');
+    chartElements.resultRoth = document.querySelector('#chart-res-roth');
+    chartElements.rothWrap = document.querySelector('.chart-info #roth-wrap');
+    chartElements.resultDifference = document.querySelector('#chart-res-diff');
+  }
+
+  const labels = [];
+  // Populate the labels array from current year to year of death
+  for (let year = currentYear; year <= yearOfDeath; year++) {
+    const age = currentAge + (year - currentYear);
+    // Display age at every 10-year milestone, or at the year of death
+    if ((year - currentYear) % 10 === 0 || year === yearOfDeath) {
+      labels.push(age.toString());
+    } else {
+      labels.push('');
+    }
+  }
+
+  const filteredTotalBalances = Object.fromEntries(Object.entries(totalBalances).filter(([year]) => Number(year) <= yearOfDeath));
+  const filteredPortfolio60_40 = Object.fromEntries(Object.entries(portfolio60_40).filter(([year]) => Number(year) <= yearOfDeath));
+
+  const totalBalancesData = {
+    data: Object.values(filteredTotalBalances),
+    borderColor: '#399E6A',
+    fill: false,
+    borderWidth: 2,
+    tension: 0.4,
+    pointRadius: 0,
+  };
+
+  const portfolio60_40Data = {
+    data: Object.values(filteredPortfolio60_40),
+    borderColor: '#0095D6',
+    backgroundColor: '#CDEFFF33',
+    fill: true,
+    borderWidth: 2,
+    tension: 0.4,
+    pointRadius: 0,
+  };
+
+  let rothData = {};
+  if (Object.keys(totalBalancesRoth).length > 0) {
+    const filteredTotalBalancesRoth = Object.fromEntries(Object.entries(totalBalancesRoth).filter(([year]) => Number(year) <= yearOfDeath));
+    rothData = {
+      data: Object.values(filteredTotalBalancesRoth),
+      borderColor: '#db9905',
+      fill: false,
+      borderWidth: 2,
+      tension: 0.4,
+      pointRadius: 0,
+    };
+    totalBalancesData.borderDash = [0, 0];
+  } else {
+    rothData = {
+      // Use total balances data
+      data: Object.values(filteredTotalBalances),
+      borderColor: '#db9905',
+      fill: false,
+      borderWidth: 2,
+      tension: 0.4,
+      pointRadius: 0,
+    };
+    totalBalancesData.borderDash = [10, 10];
+  }
+
+  const ctx = document.querySelector('.calculator-chart').getContext('2d');
+  const overviewCtx = document.querySelector('.overview-chart').getContext('2d');
+  Chart.defaults.font.family = 'Inter, sans-serif';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.font.weight = 600;
+
+  const corsairPlugin = {
+    id: 'corsair',
+    defaults: {
+      width: 1,
+      color: '#CCEAF7',
+      dash: [3, 3],
+    },
+    afterInit: (chart, args, opts) => {
+      chart.corsair = {
+        x: 0,
+        y: 0,
+      };
+    },
+    afterEvent: (chart, args) => {
+      const { inChartArea } = args;
+      const { type, x, y } = args.event;
+      chart.corsair = { x, y, draw: inChartArea };
+      chart.draw();
+    },
+    beforeDatasetsDraw: (chart, args, opts) => {
+      const { ctx } = chart;
+      const { top, bottom } = chart.chartArea;
+      const { x, draw } = chart.corsair;
+      if (!draw) return;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.lineWidth = opts.width;
+      ctx.strokeStyle = opts.color;
+      ctx.moveTo(x, bottom);
+      ctx.lineTo(x, top);
+      ctx.stroke();
+      ctx.restore();
+    },
+  };
+
+  const mainChartConfig = {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [totalBalancesData, portfolio60_40Data],
+    },
+    options: {
+      responsive: true,
+      // responsive: false,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false,
+        },
+      },
+      scales: {
+        x: {
+          beginAtZero: false,
+          border: {
+            display: true,
+            color: '#0A5999',
+            width: 2,
+          },
+          grid: {
+            display: false,
+            drawOnChartArea: false,
+            drawBorder: false,
+            drawTicks: false,
+            offset: false,
+          },
+          // clip: true,
+          // offset: true,
+          title: {
+            display: true,
+            text: 'AGE',
+            color: '#0A5999',
+            font: {
+              size: 16,
+              weight: 'bold',
+            },
+          },
+          ticks: {
+            color: '#0A5999',
+            size: 12,
+            weight: 'bold',
+            family: 'Inter',
+            autoSkip: false,
+            padding: 18,
+            rotation: 0, // Force horizontal alignment
+            minRotation: 0, // Prevent automatic rotation
+            maxRotation: 0, // Prevent automatic rotation
+            align: 'start', // Align text to the end (right side)
+            crossAlign: 'far', // Position the text away from the axis
+          },
+        },
+        y: {
+          beginAtZero: false,
+          grid: {
+            display: true,
+            color: '#CCEAF7',
+            drawBorder: false,
+            drawTicks: false,
+            offset: false,
+          },
+          border: {
+            display: true,
+            color: '#0A5999',
+            width: 2,
+          },
+          ticks: {
+            padding: 0,
+            color: '#0A5999',
+            size: 12,
+            weight: 'bold',
+            family: 'Inter',
+            callback: (value) => formatCurrencyShort(value),
+            padding: 8,
+          },
+          title: {
+            display: false,
+          },
+        },
+      },
+      layout: {
+        padding: 10,
+      },
+    },
+    plugins: [corsairPlugin],
+  };
+
+  const overviewChartConfig = {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [totalBalancesData, portfolio60_40Data],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false,
+        },
+      },
+      scales: {
+        x: {
+          beginAtZero: false,
+          border: {
+            display: true,
+            color: '#0A5999',
+            width: 2,
+          },
+          grid: {
+            display: false,
+            drawOnChartArea: false,
+            drawBorder: false,
+            drawTicks: false,
+            offset: false,
+          },
+          // clip: true,
+          // offset: true,
+          title: {
+            display: true,
+            text: 'AGE',
+            color: '#0A5999',
+            padding: 10,
+            font: {
+              size: 8,
+              weight: 'bold',
+            },
+          },
+          ticks: {
+            display: false,
+          },
+        },
+        y: {
+          beginAtZero: false,
+          grid: {
+            display: true,
+            color: '#CCEAF7',
+            drawBorder: false,
+            drawTicks: false,
+            offset: false,
+          },
+          border: {
+            display: true,
+            color: '#0A5999',
+            width: 2,
+          },
+          ticks: {
+            display: false,
+          },
+          title: {
+            display: false,
+          },
+        },
+      },
+      layout: {
+        padding: {
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 1,
+        },
+      },
+    },
+  };
+
+  if (Object.keys(rothData).length > 0) {
+    mainChartConfig.data.datasets.push(rothData);
+    overviewChartConfig.data.datasets.push(rothData);
+  }
+
+  if (chartInited) {
+    // Update existing chart
+    chart.data.labels = labels;
+    chart.data.datasets = mainChartConfig.data.datasets;
+    chart.options = mainChartConfig.options; // Update options to ensure scale settings are applied
+    chart.update('none'); // Use 'none' animation mode for immediate update
+
+    overviewChart.data.labels = labels;
+    overviewChart.data.datasets = overviewChartConfig.data.datasets;
+    overviewChart.options = overviewChartConfig.options;
+    overviewChart.update('none');
+  } else {
+    // Create new chart
+    chart = new Chart(ctx, mainChartConfig);
+    overviewChart = new Chart(overviewCtx, overviewChartConfig);
+
+    // Add hover event listener after chart is created
+    ctx.canvas.addEventListener('mousemove', (event) => {
+      const points = chart.getElementsAtEventForMode(event, 'index', { intersect: false });
+      if (points.length) {
+        const firstPoint = points[0];
+        const dataIndex = firstPoint.index;
+        const age = labels[dataIndex] || currentAge + dataIndex;
+        const btcStrat = chart.data.datasets[0].data[dataIndex];
+        const portfolioStrat = chart.data.datasets[1].data[dataIndex];
+        const rothStrat = chart.data.datasets[2]?.data[dataIndex] || 0;
+
+        chartElements.resultAge.textContent = age;
+        chartElements.resultBtc.textContent = formatCurrency(btcStrat);
+        chartElements.result60_40.textContent = formatCurrency(portfolioStrat);
+        chartElements.resultRoth.textContent = formatCurrency(rothStrat);
+        chartElements.resultDifference.textContent = formatCurrency(btcStrat - portfolioStrat);
+
+        chartElements.resultsWrap.classList.remove('is--inactive');
+      } else chartElements.resultsWrap.classList.add('is--inactive');
+    });
+
+    ctx.canvas.addEventListener('mouseleave', () => {
+      chartElements.resultsWrap.classList.add('is--inactive');
+    });
+
+    chartInited = true;
+  }
 };
