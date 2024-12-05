@@ -2,6 +2,14 @@
 const chartHeight = 32;
 let fixedBarCount = 49;
 const optimalValues = {};
+let displayGoldLine = false;
+let goldLineEqual = false;
+let annualCustomAsset1Savings = {};
+let annualCustomAsset2Savings = {};
+let annualCustomAsset3Savings = {};
+let annualCustomAsset4Savings = {};
+let annualCustomAsset5Savings = {};
+let customBtcAssets = {};
 const calcSelectors = [
   'retirement-age',
   'expectancy',
@@ -16,9 +24,7 @@ const calcSelectors = [
   'inflation-rate',
 ];
 const calcElementsAndRanges = [];
-const inputValues = {
-  'btc-price': 65000,
-};
+const inputValues = {};
 
 //------------------- Functions -------------------//
 const onlyNumbers = (value) => +String(value).replace(/\D/g, '');
@@ -51,6 +57,22 @@ const getBitcoinPrice = async () => {
     console.error('Error fetching Bitcoin price:', error);
   }
 };
+//------------------ Projected portfolio at retirement
+const getProjectedPortfolioAtRetirement = (totalBalances, yearOfRetirement) => totalBalances[yearOfRetirement];
+
+//------------------ Projected portfolio at death
+const getProjectedPortfolioAtDeath = (totalBalances, yearOfDeath) => totalBalances[yearOfDeath];
+
+//------------------ Annual Expenses at retirement
+const getAnnualBudgetAtRetirement = (annualExpenses, yearOfRetirement) => annualExpenses[yearOfRetirement];
+
+//------------------ BTC price at retirement
+const getBitcoinPriceAtRetirement = (btcPrices, yearOfRetirement) => btcPrices[yearOfRetirement];
+
+//------------------ BTC balance at retirement
+const getBtcBalanceAtRetirement = (btcBalance, yearOfRetirement) => btcBalance[yearOfRetirement];
+
+const getBtcValueWithUsd = (usdValue, btcPriceAtRetirement) => usdValue / btcPriceAtRetirement;
 
 const updateRangeSliderScale = (value, currentValue, minValue, maxValue, optimalValue, isReversedScale, index) => {
   const barWidth = (maxValue - minValue) / (fixedBarCount - 1);
@@ -257,6 +279,7 @@ window.addEventListener('load', async () => {
 
   // Get saved values from URL
   const savedValues = {};
+
   const urlParams = new URLSearchParams(window.location.search);
   for (const [key, value] of urlParams) {
     savedValues[key] = value;
@@ -264,6 +287,8 @@ window.addEventListener('load', async () => {
 
   if (window.innerWidth < 768) fixedBarCount = 35;
   initRangeSliders();
+
+  // Custom rows and dropdowns
 
   // Range sliders
   calcSelectors.forEach((selector) => {
@@ -426,28 +451,45 @@ window.addEventListener('load', async () => {
       'balance-stocks',
       'balance-bonds',
       'balance-btc',
-      'balance-cash',
       'additional-stocks',
       'additional-bonds',
       'additional-btc',
-      'additional-cash',
       'expected-stocks',
       'expected-bonds',
       'expected-btc',
       'plan-type',
       'expected-cash',
-      'btc-account',
       'growth-rate',
       'retirement-income',
       'retirement-expenses',
       'capital-gains',
       'inflation-rate',
+      'custom-additional-1',
+      'custom-amount-1',
+      'custom-asset-1',
+      'custom-status-1',
+      'custom-additional-2',
+      'custom-amount-2',
+      'custom-asset-2',
+      'custom-status-2',
+      'custom-additional-3',
+      'custom-amount-3',
+      'custom-asset-3',
+      'custom-status-3',
+      'custom-additional-4',
+      'custom-amount-4',
+      'custom-asset-4',
+      'custom-status-4',
+      'custom-additional-5',
+      'custom-amount-5',
+      'custom-asset-5',
+      'custom-status-5',
     ];
-    neededKeys.forEach((key) => {
-      console.log(key, inputValues[key]);
-    });
+    // neededKeys.forEach((key) => {
+    //   console.log(key, inputValues[key]);
+    // });
 
-    neededKeys.forEach((key) => inputValues[key] && params.append(key, inputValues[key]));
+    neededKeys.forEach((key) => (inputValues[key] || inputValues[key] == 0) && params.append(key, inputValues[key]));
 
     url.search = params.toString();
     navigator.clipboard.writeText(url.toString());
@@ -474,6 +516,18 @@ window.addEventListener('load', async () => {
       radio.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
+    // Dropdowns
+    document.querySelectorAll('.calc-layout__custom__controls-icon.is--remove').forEach((removeButton) => removeCustomRow(removeButton));
+
+    // Initial row dropdowns
+    document.querySelectorAll('.calc-layout__custom[custom-value-order="1"] .calc-dropdown').forEach((dropdown, i) => {
+      const toggleText = dropdown.querySelector('.calc-dropdown__toggle__text');
+      const initialValue = dropdown.querySelector('.calc-dropdown__list__item[initial-value="true"]');
+      toggleText.textContent = initialValue.textContent;
+      i === 0 && (inputValues['custom-asset-1'] = initialValue.getAttribute('dropdown-value'));
+      i === 1 && (inputValues['custom-status-1'] = initialValue.getAttribute('dropdown-value'));
+    });
+
     runCalculations();
   });
 
@@ -481,21 +535,26 @@ window.addEventListener('load', async () => {
   const secondaryPopup = document.querySelector('.secondary-popup');
   const secondaryPopupClose = document.querySelector('.secondary-popup .popup__close');
   // const secondaryPopupOverlay = document.querySelector('.secondary-popup .popup__overlay');
+
+  const closePopup = () => {
+    secondaryPopup.classList.remove('fade');
+    setTimeout(() => secondaryPopup.classList.remove('show'), 300);
+  };
+
   let secondaryPopupClickCount = 0;
+  let openOnNClick = 10;
   let secondaryPopupDisplayed = false;
-  document.addEventListener('click', () => {
+  document.addEventListener('click', (e) => {
     if (secondaryPopupDisplayed) return;
+    if (e.target.closest('.calc-layout__sidebar__chart')) return (openOnNClick += 10);
     secondaryPopupClickCount++;
-    if (secondaryPopupClickCount === 10) {
+    if (secondaryPopupClickCount === openOnNClick) {
       secondaryPopup.classList.add('show');
       setTimeout(() => secondaryPopup.classList.add('fade'), 10);
       secondaryPopupDisplayed = true;
     }
   });
-  secondaryPopupClose.addEventListener('click', () => {
-    secondaryPopup.classList.remove('fade');
-    setTimeout(() => secondaryPopup.classList.remove('show'), 300);
-  });
+  secondaryPopupClose.addEventListener('click', closePopup);
   // [secondaryPopupClose, secondaryPopupOverlay].forEach((element) => {
   //   element.addEventListener('click', () => {
   //     secondaryPopup.classList.remove('fade');
@@ -503,19 +562,346 @@ window.addEventListener('load', async () => {
   //   });
   // });
 
+  // Custom value rows
+  let displayedRows = 1;
+  const addCustomRow = () => {
+    const addButton = document.querySelector('#add-asset-btn');
+    // All rows
+    const rows = document.querySelectorAll('.calc-layout__custom');
+    // First non-active row
+    const row = document.querySelector('.calc-layout__custom:not(.is--active)');
+    if (!row) return;
+    // Remove is--last from all
+    rows.forEach((row) => row.classList.remove('is--last'));
+    row.classList.add('is--active');
+    //Active rows
+    const activeRows = document.querySelectorAll('.calc-layout__custom.is--active');
+    if (activeRows.length === 5) addButton.classList.add('hidden');
+    // Set flex order to 1
+    row.style.order = displayedRows;
+    displayedRows++;
+  };
+
+  const removeCustomRow = (removeButton) => {
+    const addButton = document.querySelector('#add-asset-btn');
+    // Clicked row
+    const row = removeButton.closest('.calc-layout__custom');
+    const rowOrder = row.getAttribute('custom-value-order');
+    // Reset values and toggle text
+    row.querySelectorAll('.calc-dropdown__toggle__text').forEach((toggle) => (toggle.textContent = toggle.getAttribute('initial-toggle-text')));
+    row.querySelectorAll('input.calc-field').forEach((input) => (input.value = '$' + input.getAttribute('init-value')));
+    inputValues[`custom-asset-${rowOrder}`] = 0;
+    inputValues[`custom-status-${rowOrder}`] = 0;
+    inputValues[`custom-amount-${rowOrder}`] = 0;
+    inputValues[`custom-additional-${rowOrder}`] = 0;
+
+    // Remove is--active and is--last
+    row.classList.remove('is--active', 'is--last');
+
+    document.querySelectorAll('.calc-layout__custom').forEach((row) => row.classList.remove('is--last'));
+    // Add is--last to last row to the last active row that has the highest order
+    const allActiveRows = document.querySelectorAll('.calc-layout__custom.is--active');
+    let highestOrder = -2;
+    let lastActiveRow;
+    allActiveRows.forEach((row) => {
+      // Get style order
+      const order = +row.style.order;
+      if (order > highestOrder) {
+        highestOrder = order;
+        lastActiveRow = row;
+      }
+    });
+    lastActiveRow.classList.add('is--last');
+    addButton.classList.remove('hidden');
+    runCalculations();
+  };
+  // Dropdowns
+  document.querySelectorAll('.calc-dropdown__list.is--initial').forEach(function (list) {
+    const customValueOrder = list.closest('.calc-layout__custom').getAttribute('custom-value-order');
+    const toggleText = list.closest('.calc-dropdown').querySelector('.calc-dropdown__toggle__text');
+    const customValueType = list.getAttribute('custom-value-type');
+    // On click
+    list.addEventListener('click', function (e) {
+      if (!e.target.classList.contains('calc-dropdown__list__item')) return;
+      toggleText && (toggleText.textContent = e.target.textContent);
+      // Save value
+      const customValue = e.target.getAttribute('dropdown-value');
+      inputValues[`custom-${customValueType}-${customValueOrder}`] = customValue;
+      $('.calc-dropdown').trigger('w-close');
+      runCalculations();
+    });
+    const savedValue = savedValues[`custom-${customValueType}-${customValueOrder}`] || false;
+    // console.log(`custom-${customValueType}-${customValueOrder}`, savedValue);
+
+    // If it's the first one, set as initial
+    if (customValueOrder === '1') {
+      if (savedValue) {
+        toggleText && (toggleText.textContent = list.querySelector(`.calc-dropdown__list__item[dropdown-value="${savedValue}"]`).textContent);
+        inputValues[`custom-${customValueType}-1`] = savedValue;
+      } else {
+        toggleText && (toggleText.textContent = list.querySelector('.calc-dropdown__list__item[initial-value="true"]').textContent);
+        inputValues[`custom-${customValueType}-1`] = list
+          .querySelector('.calc-dropdown__list__item[initial-value="true"]')
+          .getAttribute('dropdown-value');
+      }
+    } else {
+      // console.log('Custom value order:', customValueOrder, 'Saved value:', savedValue, typeof savedValue);
+
+      if (customValueOrder && savedValue && savedValue !== '0') {
+        // Every second dropdown
+        if (
+          `custom-asset-${customValueOrder}` === `custom-${customValueType}-${customValueOrder}` &&
+          `custom-${customValueType}-${customValueOrder}` !== false
+        ) {
+          addCustomRow();
+        }
+
+        const savedItem = list.querySelector(`.calc-dropdown__list__item[dropdown-value="${savedValue}"]`);
+        if (savedItem && toggleText) {
+          toggleText.textContent = savedItem.textContent;
+          inputValues[`custom-${customValueType}-${customValueOrder}`] = savedValue;
+        }
+      }
+    }
+    list.classList.remove('is--initial');
+  });
+
+  document.querySelector('#add-asset-btn')?.addEventListener('click', addCustomRow);
+
+  document.querySelectorAll('.calc-layout__custom__controls-icon.is--remove').forEach((removeButton) => {
+    removeButton.addEventListener('click', function () {
+      // runCalculations();
+      removeCustomRow(removeButton);
+    });
+  });
+
+  // const deselectRanges = () => {
+  //   document.querySelectorAll('.calc__slider-range').forEach((range) => range.blur());
+  // };
+  // const isTouchDevice = 'ontouchstart' in document.documentElement;
+  // // Safari bug fix for range sliders
+  // if (isTouchDevice) {
+  //   console.log('Is touch device');
+  //   document.addEventListener('pointerup', deselectRanges);
+  //   document.addEventListener('touchend', deselectRanges);
+  // }
+
+  // iOS fixes
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIos) {
+    let activeSlider = null;
+    document.querySelectorAll('.calc__slider-range').forEach((slider) => {
+      // let isDragging = false;
+      // // Detect drag start
+      // slider.addEventListener('pointerdown', (e) => {
+      //   isDragging = true;
+      //   e.preventDefault(); // Prevent the initial "jump"
+      // });
+
+      // // Detect drag end
+      // document.addEventListener('pointerup', () => {
+      //   isDragging = false;
+      // });
+
+      // // Prevent click interactions
+      // slider.addEventListener('click', (e) => {
+      //   if (!isDragging) {
+      //     e.preventDefault();
+      //     e.stopPropagation();
+      //   }
+      // });
+
+      // // Prevent pointerdown from triggering value change if not dragging
+      // slider.addEventListener('pointerdown', (e) => {
+      //   if (!isDragging) {
+      //     e.preventDefault();
+      //     e.stopPropagation();
+      //   }
+      // });
+      slider.addEventListener('mousedown', () => {
+        activeSlider = slider;
+      });
+      slider.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      slider.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+    secondaryPopupClose.addEventListener('touchend', closePopup);
+    secondaryPopupClose.addEventListener('touchend', closePopup);
+    secondaryPopupClose.addEventListener('pointerdown', closePopup);
+    document.addEventListener('mousemove', (event) => {
+      if (!activeSlider?.contains(event.target)) {
+        event.preventDefault();
+      }
+    });
+    document.addEventListener('mouseup', () => (activeSlider = null));
+
+    //Popup closing
+  }
+  // document.addEventListener('pointerup', () => {
+  //   const activeElement = document.activeElement;
+  //   if (activeElement && activeElement.tagName === 'INPUT' && activeElement.type === 'range') {
+  //     activeElement.blur();
+  //   }
+  // });
+  // // Fallback for older mobile Safari
+  // document.addEventListener('touchend', () => {
+  //   const activeElement = document.activeElement;
+  //   if (activeElement && activeElement.tagName === 'INPUT' && activeElement.type === 'range') {
+  //     activeElement.blur();
+  //   }
+  // });
+
+  //Mobile fixed nav
+  const targetElement = document.querySelector('.calc-layout__right');
+  const referenceElement = document.querySelector('.container.is--simple-nav');
+
+  const handleMobileScroll = () => {
+    if (targetElement && referenceElement) {
+      const referenceHeight = referenceElement.offsetHeight;
+
+      window.addEventListener('scroll', function mobileScrollHandler() {
+        if (window.innerWidth < 992) {
+          if (window.scrollY > referenceHeight) {
+            targetElement.classList.add('is--fixed');
+          } else targetElement.classList.remove('is--fixed');
+        } else targetElement.classList.remove('is--fixed');
+      });
+    } else {
+      console.error('Required elements are missing in the DOM.');
+    }
+  };
+
+  const handleResize = () => {
+    if (window.innerWidth >= 992) {
+      if (targetElement) targetElement.classList.remove('is--fixed');
+    } else handleMobileScroll();
+  };
+
+  if (window.innerWidth < 992) handleMobileScroll();
+  window.addEventListener('resize', handleResize);
+
   window.dispatchEvent(new Event('resize'));
+
+  //-------------- End of load event --------------//
 });
 //------------------ Calculations ------------------//
+// Constants
+const currentYear = new Date().getFullYear();
+// Fallback variable, will be updated with the current BTC price
+let currentBtcPrice = 65000;
 //------------------ S2F Model prices
 // prettier-ignore
-const btcPricesS2F = {2023:83667.67557239954,2024:686398.0127483337,2025:703741.9524243205,2026:721375.6236071566,2027:739301.4262968419,2028:5986997.015654025,2029:6060174.083947013,2030:6133945.0152537,2031:6208312.209574085,2032:49965761.24291532,2033:50266224.53526536,2034:50567889.953642786,2035:50870759.89804761,2036:408181178.5400824,2037:409398694.1478387,2038:410618628.40764976,2039:411840983.7195157,2040:3299624560.159754,2041:3304526099.867491,2042:3309432491.2793384,2043:3314343736.795295,2044:26534409444.738514,2045:26554078710.52289,2046:26573757694.115482,2047:26593446397.916298,2048:212826355165.1583,2049:212905158594.60263,2050:212983981474.06342,2051:213062823805.94064,2052:1704818018138.2832,2053:1705133484741.0745,2054:1705448990258.2983,2055:1705764534692.3552,2056:13647378572031.568,2057:13648640944365.16,2058:13649903394542.018,2059:13651165922564.541,2060:109214377726149.42,2061:109219428227481.05,2062:109224478884513.6,2063:109229529697249.48,2064:873856441296055.4,2065:873876645325528.8,2066:873896849666418.5,2067:873917054318726.8,2068:6991417254093309,2069:6991498074259649,2070:6991578895048836,2071:6991659716460872,2072:55933601019203670,2073:55933924307966080,2074:55934247597974184,2075:55934570889228010,2076:447477860282576500,2077:447479153453820400,2078:447480446627555650,2079:447481739803782400,2080:3579859091142640000,2081:3579864263860004400,2082:3579869436582351400,2083:3579874609309681000,2084:28639017565401715000,2085:28639038256335950000,2086:28639058947280150000,2087:28639079638234317000,2088:229112719869721100000,2089:229112802633587600000,2090:229112885397474000000,2091:229112968161380340000,2092:1.832904076346728e21,2093:1.832904407402453e21,2094:1.832904738458218e21,2095:1.832905069514023e21,2096:1.4663241880335521e22,2097:1.4663243204558938e22,2098:1.4663244528782437e22,2099:1.4663245853006015e22,2100:1.1730597212094267e23,2101:1.1730597741783739e23,2102:1.1730598271473226e23,2103:1.173059880116273e23,2104:9.384479252805988e23,2105:9.384479464681798e23,2106:9.38447967655761e23,2107:9.384479888433425e23,2108:7.507583995497068e24,2109:7.507584080247396e24,2110:7.507584164997724e24,2111:7.507584249748053e24,2112:6.006067433698574e25,2113:6.0060674675987065e25,2114:6.006067501498839e25,2115:6.006067535398971e25,2116:4.8048540418792296e26,2117:4.8048540554392825e26,2118:4.804854068999335e26,2119:4.804854082559388e26,2120:3.8438832714715317e27,2121:3.843883276895553e27,2122:3.8438832823195746e27,2123:3.843883287743595e27,2124:3.075106632364485e28,2125:3.075106634586495e28,2126:3.075106636808505e28,2127:3.075106639030515e28,2128:2.460085306062612e29,2129:2.460085306646612e29,2130:2.460085307230612e29,2131:2.460085307814612e29,2132:1.9680682457644896e30,2133:1.9680682458004896e30,2134:1.9680682458364896e30,2135:1.9680682458724896e30,2136:1.5744545966091917e31,2137:1.5744545966101917e31,2138:1.5744545966111917e31,2139:1.5744545966121917e31,2140:1.2595636772888455e32,2141:1.2595636772889455e32,2142:1.2595636772890455e32,2143:1.2595636772891455e32,2144:1.0076509418312764e33,2145:1.0076509418312864e33,2146:1.0076509418312964e33,2147:1.0076509418313064e33,2148:8.06120753465051e33,2149:8.06120753465052e33,2150:8.06120753465053e33,
+// const btcPricesS2F = {2023:83667.67557239954,2024:686398.0127483337,2025:703741.9524243205,2026:721375.6236071566,2027:739301.4262968419,2028:5986997.015654025,2029:6060174.083947013,2030:6133945.0152537,2031:6208312.209574085,2032:49965761.24291532,2033:50266224.53526536,2034:50567889.953642786,2035:50870759.89804761,2036:408181178.5400824,2037:409398694.1478387,2038:410618628.40764976,2039:411840983.7195157,2040:3299624560.159754,2041:3304526099.867491,2042:3309432491.2793384,2043:3314343736.795295,2044:26534409444.738514,2045:26554078710.52289,2046:26573757694.115482,2047:26593446397.916298,2048:212826355165.1583,2049:212905158594.60263,2050:212983981474.06342,2051:213062823805.94064,2052:1704818018138.2832,2053:1705133484741.0745,2054:1705448990258.2983,2055:1705764534692.3552,2056:13647378572031.568,2057:13648640944365.16,2058:13649903394542.018,2059:13651165922564.541,2060:109214377726149.42,2061:109219428227481.05,2062:109224478884513.6,2063:109229529697249.48,2064:873856441296055.4,2065:873876645325528.8,2066:873896849666418.5,2067:873917054318726.8,2068:6991417254093309,2069:6991498074259649,2070:6991578895048836,2071:6991659716460872,2072:55933601019203670,2073:55933924307966080,2074:55934247597974184,2075:55934570889228010,2076:447477860282576500,2077:447479153453820400,2078:447480446627555650,2079:447481739803782400,2080:3579859091142640000,2081:3579864263860004400,2082:3579869436582351400,2083:3579874609309681000,2084:28639017565401715000,2085:28639038256335950000,2086:28639058947280150000,2087:28639079638234317000,2088:229112719869721100000,2089:229112802633587600000,2090:229112885397474000000,2091:229112968161380340000,2092:1.832904076346728e21,2093:1.832904407402453e21,2094:1.832904738458218e21,2095:1.832905069514023e21,2096:1.4663241880335521e22,2097:1.4663243204558938e22,2098:1.4663244528782437e22,2099:1.4663245853006015e22,2100:1.1730597212094267e23,2101:1.1730597741783739e23,2102:1.1730598271473226e23,2103:1.173059880116273e23,2104:9.384479252805988e23,2105:9.384479464681798e23,2106:9.38447967655761e23,2107:9.384479888433425e23,2108:7.507583995497068e24,2109:7.507584080247396e24,2110:7.507584164997724e24,2111:7.507584249748053e24,2112:6.006067433698574e25,2113:6.0060674675987065e25,2114:6.006067501498839e25,2115:6.006067535398971e25,2116:4.8048540418792296e26,2117:4.8048540554392825e26,2118:4.804854068999335e26,2119:4.804854082559388e26,2120:3.8438832714715317e27,2121:3.843883276895553e27,2122:3.8438832823195746e27,2123:3.843883287743595e27,2124:3.075106632364485e28,2125:3.075106634586495e28,2126:3.075106636808505e28,2127:3.075106639030515e28,2128:2.460085306062612e29,2129:2.460085306646612e29,2130:2.460085307230612e29,2131:2.460085307814612e29,2132:1.9680682457644896e30,2133:1.9680682458004896e30,2134:1.9680682458364896e30,2135:1.9680682458724896e30,2136:1.5744545966091917e31,2137:1.5744545966101917e31,2138:1.5744545966111917e31,2139:1.5744545966121917e31,2140:1.2595636772888455e32,2141:1.2595636772889455e32,2142:1.2595636772890455e32,2143:1.2595636772891455e32,2144:1.0076509418312764e33,2145:1.0076509418312864e33,2146:1.0076509418312964e33,2147:1.0076509418313064e33,2148:8.06120753465051e33,2149:8.06120753465052e33,2150:8.06120753465053e33,
+// };
+const btcPricesS2F = () => {
+  const startYear = 2010;
+  const numYears = 150;
+
+  // Bitcoin halving schedule
+  const initialBlockReward = 50;
+  const blockTime = 10; // minutes
+  const blocksPerYear = (365 * 24 * 60) / blockTime;
+  const halvingInterval = 210000; // blocks
+  const halvingYears = halvingInterval / blocksPerYear;
+
+  // Historical S2F data for model calibration
+  let historicalData = [
+    { year: 2010, price: 0.06, sf: 1.5 },
+    { year: 2011, price: 6, sf: 2.5 },
+    { year: 2012, price: 12, sf: 4.5 },
+    { year: 2013, price: 742, sf: 10.5 },
+    { year: 2014, price: 318, sf: 12.5 },
+    { year: 2015, price: 431, sf: 15.5 },
+    { year: 2016, price: 967, sf: 21.5 },
+    { year: 2017, price: 13900, sf: 25.5 },
+    { year: 2018, price: 3688, sf: 27.5 },
+    { year: 2019, price: 7185, sf: 28.5 },
+    { year: 2020, price: 28997, sf: 56.0 },
+    { year: 2021, price: 46155, sf: 56.2 },
+    { year: 2022, price: 16663, sf: 56.4 },
+    { year: 2023, price: 42297, sf: 56.6 },
+    { year: 2024, price: 99968, sf: 119.7 },
+  ];
+
+  // Update current year price if provided
+  if (currentBtcPrice) {
+    const currentYearIndex = historicalData.findIndex((data) => data.year === currentYear);
+    if (currentYearIndex !== -1) {
+      // Update existing year's price
+      historicalData[currentYearIndex].price = currentBtcPrice;
+    } else {
+      // Add new entry for current year
+      const lastEntry = historicalData[historicalData.length - 1];
+      historicalData.push({
+        year: currentYear,
+        price: currentBtcPrice,
+        sf: lastEntry.sf, // Use the last known SF ratio
+      });
+    }
+  }
+
+  // Step 1: Convert to logarithmic scale and perform linear regression
+  const logData = historicalData.map(({ sf, price }) => ({
+    x: Math.log10(sf),
+    y: Math.log10(price),
+  }));
+
+  // Calculate regression coefficients
+  const n = logData.length;
+  const sumX = logData.reduce((sum, point) => sum + point.x, 0);
+  const sumY = logData.reduce((sum, point) => sum + point.y, 0);
+  const sumXY = logData.reduce((sum, point) => sum + point.x * point.y, 0);
+  const sumX2 = logData.reduce((sum, point) => sum + point.x * point.x, 0);
+
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+
+  // Calculate S2F ratio for any year
+  const calculateSF = (yearsSinceStart) => {
+    const halvings = Math.floor(yearsSinceStart / halvingYears);
+    const currentBlockReward = initialBlockReward / Math.pow(2, halvings);
+    const annualProduction = currentBlockReward * blocksPerYear;
+    const totalSupply = calculateTotalSupply(yearsSinceStart);
+    return totalSupply / annualProduction;
+  };
+
+  // Helper function to calculate total supply
+  const calculateTotalSupply = (yearsSinceStart) => {
+    let supply = 0;
+    let currentBlockReward = initialBlockReward;
+
+    for (let y = 0; y < yearsSinceStart; y++) {
+      const halvings = Math.floor(y / halvingYears);
+      currentBlockReward = initialBlockReward / Math.pow(2, halvings);
+      supply += currentBlockReward * blocksPerYear;
+    }
+
+    return supply;
+  };
+
+  // Generate predictions in the same format as Power Law model
+  const predictions = {};
+  for (let i = 0; i < numYears; i++) {
+    const year = startYear + i;
+    if (year === currentYear && currentBtcPrice) {
+      predictions[year] = currentBtcPrice;
+    } else {
+      const sf = calculateSF(i);
+      const logPrice = slope * Math.log10(sf) + intercept;
+      predictions[year] = Math.pow(10, logPrice);
+    }
+  }
+
+  return predictions;
 };
 
 //---------------- Power law
-// prettier-ignore
-// const btcPricesPowerLaw={2010:0.03010628391340072,2011:1.1665179071089278,2012:9.907153518999726,2013:45.19867119834384,2014:146.69756182579547,2015:383.8690959546252,2016:865.7538110434199,2017:1751.2974860018503,2018:3260.172897171796,2019:5684.040358193767,2020:9398.205992247365,2021:14873.644841217618,2022:22689.361763417706,2023:33545.06742296482,2024:48274.150009732526,2025:67856.9259484952,2026:93434.15495479168,2027:126320.80650542538,2028:168020.06620561847,2029:220237.57171875774,2030:284895.86892683443,2031:364149.07984625496,2032:460397.7745621203,2033:576304.0400856528,2034:714806.7396007673,2035:879136.956059804,2036:1072833.6145261182,2037:1299759.2780504897,2038:1564116.11221663,2039:1870462.0138040376,2040:2223726.899298489,2041:2629229.1492358693,2042:3092692.20459768,2043:3620261.3116871836,2044:4218520.412109992,2045:4894509.174658779,2046:5655740.166065894,2047:6510216.157738416,2048:7466447.56572719,2049:8533470.021312093,2050:9720862.069704706,2051:11038762.99447847,2052:12497890.765443347,2053:14109560.10777605,2054:15885700.690305535,2055:17838875.430944793,2056:19982298.91732885,2057:22329855.9408026,2058:24896120.141967528,2059:27696372.76606204,2060:30746621.526514836,2061:34063619.575065486,2062:37664884.57690828,2063:41568717.88935906,2064:45794223.84260448,2065:50361329.121127106,2066:55290802.24446532,2067:60604273.145984486,2068:66324252.848392956,2069:72474153.23477471,2070:79078306.9139389,2071:86161987.17892468,2072:93751428.05753744,2073:101873844.45382282,2074:110557452.37940992,2075:119831489.27368927,2076:129726234.41182208,2077:140273029.3995864,2078:151504298.75413832,2079:163453570.5697123,2080:176155497.2673918,2081:189645876.42804408,2082:203961671.7075677,2083:219141033.83361897,2084:235223321.68296367,2085:252249123.43869257,2086:270260277.82650423,2087:289299895.4292663,2088:309412380.07914644,2089:330643450.3265579,2090:353040160.9852152,2091:376650924.7525929,2092:401525533.90509224,2093:427715182.06731635,2094:455272486.0546629,2095:484251507.78876597,2096:514707776.2849914,2097:546698309.7114946,2098:580281637.519149,2099:615517822.6418598,2100:652468483.7665489,2101:691196817.6723416,2102:731767621.6383815,2103:774247315.91971,2104:818703966.2906268,2105:865207306.6551566,2106:913828761.7238742,2107:964641469.7568666,2108:1017720305.3720078,2109:1073141902.4184024,2110:1130984676.914149,2111:1191328850.0483358,2112:1254256471.2464457,2113:1319851441.2990417,2114:1388199535.5529408,2115:1459388427.1647863,2116:1533507710.416309,2117:1610648924.0909843,2118:1690905574.9117064,2119:1774373161.0388107,2120:1861149195.6284683,2121:1951333230.450664,2122:2045026879.5664902,2123:2142333843.06452,/**/2124:2243359930.8555956,2125:2348213187.2468762,2126:2457003848.429197,2127:2569844421.318914,2128:2686849762.5737424,2129:2808137152.919356,2130:2933826241.2336226,2131:3064039183.7189164,2132:3198900557.6991563,2133:3338537479.274699,2134:3483079594.9370136,2135:3632659358.393442,2136:3787412122.3454347,2137:3947476186.1085377,2138:4112982582.5432158,2139:4284065241.7017865,2140:4460850714.863287,2141:4643468531.0255375,2142:4832041129.041158,2143:5026693943.046582,2144:5227555547.292991,2145:5434757559.012363,2146:5648434824.287295,2147:5868725423.872905,2148:6095760671.162726,2149:6329675264.029956,2150:6570607324.946248,
-// };
-const btcPricesPowerLaw= (() => {
+const btcPricesPowerLaw = () => {
   const startYear = 2010;
   const numYears = 150;
   const historicalData = [
@@ -533,8 +919,9 @@ const btcPricesPowerLaw= (() => {
     { time: 12, price: 14873.64 },
     { time: 13, price: 22689.36 },
     { time: 14, price: 33545.07 },
-    { time: 15, price: 89000 },
+    { time: 15, price: currentBtcPrice || 99636.1 }, // Use provided current price or default
   ];
+
   // Step 1: Convert time and price to logarithmic scale
   const logData = historicalData.map(({ time, price }) => ({
     x: Math.log(time),
@@ -551,20 +938,27 @@ const btcPricesPowerLaw= (() => {
   const b = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
   const a = Math.exp((sumY - b * sumX) / n);
 
-  // Step 3: Generate predictions for a range of years
+  // Step 3: Calculate adjustment factor to match current price
+  const yearsSinceStart = currentYear - startYear + 1;
+  const modelPrediction = a * Math.pow(yearsSinceStart, b);
+  const adjustmentFactor = currentBtcPrice / modelPrediction;
+
+  // Step 4: Generate predictions with adjustment
   const predictions = {};
   for (let i = 0; i < numYears; i++) {
     const year = startYear + i;
-    predictions[year] = a * Math.pow(i + 1, b); // i + 1 to match "years since start"
+    const basePrediction = a * Math.pow(i + 1, b);
+
+    // Apply graduated adjustment that diminishes over time
+    const yearDiff = Math.abs(year - currentYear);
+    const adjustmentWeight = Math.exp(-yearDiff / 10); // Decay factor of 10 years
+    const finalAdjustment = 1 + (adjustmentFactor - 1) * adjustmentWeight;
+
+    predictions[year] = basePrediction * finalAdjustment;
   }
 
   return predictions;
-})();
-
-// Constants
-const currentYear = new Date().getFullYear();
-// Fallback variable, will be updated with the current BTC price
-let currentBtcPrice = 65000;
+};
 
 //------------------ Saylor' s 2024 Bitcoin Model prices
 const btcPricesBtc24 = () => {
@@ -612,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const runCalculations = () => {
   // Check if all required input values are present
   // prettier-ignore
-  const requiredInputs = ['btc-price','current-age','balance-stocks','balance-bonds','balance-btc','balance-cash','additional-stocks','additional-bonds','additional-btc','additional-cash','retirement-age','expectancy','expected-stocks','expected-bonds','expected-cash','expected-btc','growth-rate','retirement-income','retirement-expenses','capital-gains','inflation-rate','plan-type','btc-account',/*'retirement-strategy-sell', 'retirement-strategy-order', */
+  const requiredInputs = ['current-age','balance-stocks','balance-bonds','balance-btc','additional-stocks','additional-bonds','additional-btc','retirement-age','expectancy','expected-stocks','expected-bonds','expected-cash','expected-btc','growth-rate','retirement-income','retirement-expenses','capital-gains','inflation-rate','plan-type',/*'retirement-strategy-sell', 'retirement-strategy-order', */
    ];
 
   const missingInputs = requiredInputs.filter((input) => !inputValues[input] && inputValues[input] !== 0);
@@ -623,21 +1017,6 @@ const runCalculations = () => {
   }
 
   const currentAge = inputValues['current-age'];
-
-  //------------------ Projected portfolio at retirement
-  const getProjectedPortfolioAtRetirement = (totalBalances, yearOfRetirement) => totalBalances[yearOfRetirement];
-
-  //------------------ Projected portfolio at death
-  const getProjectedPortfolioAtDeath = (totalBalances, yearOfDeath) => totalBalances[yearOfDeath];
-
-  //------------------ Annual Expenses at retirement
-  const getAnnualBudgetAtRetirement = (annualExpenses, yearOfRetirement) => annualExpenses[yearOfRetirement];
-
-  //------------------ BTC price at retirement
-  const getBitcoinPriceAtRetirement = (btcPrices, yearOfRetirement) => btcPrices[yearOfRetirement];
-
-  //------------------ BTC balance at retirement
-  const getBtcBalanceAtRetirement = (btcBalance, yearOfRetirement) => btcBalance[yearOfRetirement];
 
   //------------------ Years of sustainable withdrawals
   const getYearsOfSustainableWithdrawals = (retirementSuccessStatus, yearOfRetirement, yearOfDeath) => {
@@ -671,42 +1050,82 @@ const runCalculations = () => {
     return annualSavings;
   };
 
+  //------------------- Calculate custom roth and non-roth annual savings
+  const getAllRothAndNonRothContributions = () => {
+    let startingValue = 0;
+    for (i = 1; i <= 5; i++) {
+      startingValue += +inputValues[`custom-additional-${i}`] || 0;
+    }
+
+    const annualSavings = getAnnualSavingsOrExpenses(
+      startingValue,
+      currentYear + inputValues['retirement-age'] - currentAge,
+      inputValues['expectancy'],
+      false,
+      true
+    );
+    return annualSavings;
+  };
+
+  //------------------ Get custom asset balance
+  const getCustomAssetBalance = (assetType, previousYearValue, currentYearSavings, currentYearSold, btcGrowthFactor) => {
+    switch (assetType) {
+      case 'stocks':
+        return (previousYearValue || 0) * (1 + inputValues['expected-stocks'] / 100) + (currentYearSavings || 0) + (currentYearSold || 0);
+      case 'bonds':
+        return (previousYearValue || 0) * (1 + inputValues['expected-bonds'] / 100) + (currentYearSavings || 0) + (currentYearSold || 0);
+      case 'btc':
+        return (previousYearValue || 0) * btcGrowthFactor + (currentYearSavings || 0) + (currentYearSold || 0);
+      case 'other':
+        return (previousYearValue || 0) * (1 + inputValues['expected-cash'] / 100) + (currentYearSavings || 0) + (currentYearSold || 0);
+      default:
+        return previousYearValue;
+    }
+  };
+  const getGrowthFactor = (assetType, btcGrowthFactor) => {
+    switch (assetType) {
+      case 'stocks':
+        return 1 + inputValues['expected-stocks'] / 100;
+      case 'bonds':
+        return 1 + inputValues['expected-bonds'] / 100;
+      case 'btc':
+        return btcGrowthFactor;
+      case 'other':
+        return 1 + inputValues['expected-cash'] / 100;
+      default:
+        return 1;
+    }
+  };
+
   //------------------ All BTC balances
   const getAllBtcBalances = (expectedBtc) => {
     const btcBalances = {};
     btcBalances[currentYear] = inputValues['balance-btc'];
     if (inputValues['plan-type'] === 'btc24') return btcPricesBtc24();
-    else if (inputValues['plan-type'] === 'power-law') return btcPricesPowerLaw;
+    else if (inputValues['plan-type'] === 'power-law') return btcPricesPowerLaw();
     else if (inputValues['plan-type'] === 'custom') return btcPricesCustom(expectedBtc);
-    else return btcPricesS2F;
+    else return btcPricesS2F();
   };
 
   //------------------ Withdrawals needed
-  const getWithdrawalsNeeded = (expenses, accountType, yearOfRetirement, expectancy, capitalGains = inputValues['capital-gains']) => {
+  const getWithdrawalsNeeded = (expenses, yearOfRetirement, expectancy, capitalGains = inputValues['capital-gains']) => {
     const withdrawalsNeeded = {};
     for (let i = 1; i <= expectancy; i++) {
       const localCurrentYear = currentYear + i;
       // Get user age in local year
       const localAge = currentAge + i;
       // Capital gains tax doesn't apply for "roth" after year 60
-      const formattedCapitalGains = localAge >= 60 && accountType === 'roth' ? 0 : capitalGains;
+      // const formattedCapitalGains = localAge >= 60 && accountType === 'roth' ? 0 : capitalGains;
 
       if (localCurrentYear > yearOfRetirement) {
-        let withdrawal;
-        // if (accountType === 'roth') {
-        //   // Tax free after year 60
-        //   if (localAge >= 60) withdrawal = expenses[localCurrentYear];
-        //   else withdrawal = expenses[localCurrentYear] / (1 - capitalGains / 100);
-        // } else {
-        //   withdrawal = expenses[localCurrentYear] / (1 - capitalGains / 100);
-        // }
-        if (accountType === 'none') withdrawal = expenses[localCurrentYear] / (1 - formattedCapitalGains / 100);
-        else withdrawal = expenses[localCurrentYear];
+        // let withdrawal;
+        // if (accountType === 'none') withdrawal = expenses[localCurrentYear] / (1 - formattedCapitalGains / 100);
+        // else withdrawal = expenses[localCurrentYear];
 
         // withdrawal = expenses[localCurrentYear] / (1 - formattedCapitalGains / 100);
         // console.log('accountType', accountType, 'Year', localCurrentYear, 'Age', localAge, 'Capital gains', formattedCapitalGains);
 
-        withdrawalsNeeded[localCurrentYear] = withdrawal;
+        withdrawalsNeeded[localCurrentYear] = expenses[localCurrentYear] / (1 - capitalGains / 100);
       } else withdrawalsNeeded[localCurrentYear] = 0;
     }
     return withdrawalsNeeded;
@@ -751,26 +1170,22 @@ const runCalculations = () => {
     projectedPortfolioAtRetirement
   ) => {
     setTimeout(() => {
-      const btcPriceAtRetirement = getBitcoinPriceAtRetirement(btcPrices, currentYear + (inputValues['retirement-age'] - currentAge));
+      const retirementYear = currentYear + (inputValues['retirement-age'] - currentAge);
+      const btcPriceAtRetirement = getBitcoinPriceAtRetirement(btcPrices, retirementYear);
+      const customBtcBalanceAtRetirement = getBtcValueWithUsd(customBtcAssets[retirementYear] || 0, btcPriceAtRetirement);
+      const btcBalanceAtRetirement = getBtcBalanceAtRetirement(btcBalance, retirementYear) / btcPriceAtRetirement;
+      console.log('customBtcBalanceAtRetirement', customBtcBalanceAtRetirement, 'btcBalanceAtRetirement', btcBalanceAtRetirement);
+
       sidebarElements.retireBy && (sidebarElements.retireBy.value = inputValues['retirement-age']);
       sidebarElements.portfolioAtRetirement && (sidebarElements.portfolioAtRetirement.value = formatCurrency(projectedPortfolioAtRetirement));
       sidebarElements.btcAtRetirement &&
-        (sidebarElements.btcAtRetirement.value =
-          '₿' +
-          formatCurrency(
-            getBtcBalanceAtRetirement(btcBalance, currentYear + (inputValues['retirement-age'] - currentAge)) / btcPriceAtRetirement,
-            3
-          ).replace('$', ''));
+        (sidebarElements.btcAtRetirement.value = '₿' + formatCurrency(btcBalanceAtRetirement + customBtcBalanceAtRetirement, 3).replace('$', ''));
       sidebarElements.btcPriceAtRetirement && (sidebarElements.btcPriceAtRetirement.value = formatCurrency(btcPriceAtRetirement));
       sidebarElements.monthlyBudget && (sidebarElements.monthlyBudget.value = formatCurrency(annualBudgetAtRetirement / 12));
       sidebarElements.annualBudget && (sidebarElements.annualBudget.value = formatCurrency(annualBudgetAtRetirement));
       sidebarElements.yearsOfWithdrawals &&
         (sidebarElements.yearsOfWithdrawals.value = formatToFixed(
-          getYearsOfSustainableWithdrawals(
-            retirementSuccessStatus,
-            currentYear + (inputValues['retirement-age'] - currentAge),
-            currentYear - currentAge + inputValues['expectancy']
-          ),
+          getYearsOfSustainableWithdrawals(retirementSuccessStatus, retirementYear, currentYear - currentAge + inputValues['expectancy']),
           1
         ));
       sidebarElements.portfolioAtDeath && (sidebarElements.portfolioAtDeath.value = formatCurrency(projectedPortfolioAtDeath));
@@ -792,14 +1207,15 @@ const runCalculations = () => {
     annualBtcSavings,
     annualStocksSavings,
     annualBondsSavings,
-    annualCashSavings,
+    annualCustomSavings,
     expectancy,
     yearOfRetirement,
     expectedStocksGrowthRate,
     expectedBondsGrowthRate,
     expectedCashGrowthRate,
     expectedBtcGrowthRate,
-    logResults = true
+    logResultsF = false,
+    isSimulation = false
   ) => {
     const totalBalances = {};
     const btcBalance = {};
@@ -808,10 +1224,11 @@ const runCalculations = () => {
     const stocksSold = {};
     const bondsBalance = {};
     const bondsSold = {};
-    const cashIncomeBalance = {};
     const btcPrices = getAllBtcBalances(expectedBtcGrowthRate);
     const retirementSuccessStatus = {};
     const portfolio60_40 = {};
+    const portfolio60_40Stocks = {};
+    const portfolio60_40Bonds = {};
 
     const stocksGrowthRate = expectedStocksGrowthRate;
     const bondsGrowthRate = expectedBondsGrowthRate;
@@ -819,67 +1236,394 @@ const runCalculations = () => {
 
     // console.log(expectancy, yearOfRetirement, stocksGrowthRate, bondsGrowthRate, cashGrowthRate);
 
-    const initialBondsBalance = inputValues['balance-bonds'];
     const initialStocksBalance = inputValues['balance-stocks'];
+    const initialBondsBalance = inputValues['balance-bonds'];
     const initialBtcBalance = inputValues['balance-btc'];
-    const initialCashBalance = inputValues['balance-cash'];
+
+    let isTaxPenalty = false;
+
+    // Custom assets
+    const customAsset1 = inputValues['custom-amount-1'] || 0;
+    const customAsset2 = inputValues['custom-amount-2'] || 0;
+    const customAsset3 = inputValues['custom-amount-3'] || 0;
+    const customAsset4 = inputValues['custom-amount-4'] || 0;
+    const customAsset5 = inputValues['custom-amount-5'] || 0;
+    // Custom asset types (stocks, bonds, btc, other)
+    let customAsset1Type = inputValues['custom-asset-1'];
+    let customAsset2Type = inputValues['custom-asset-2'];
+    let customAsset3Type = inputValues['custom-asset-3'];
+    let customAsset4Type = inputValues['custom-asset-4'];
+    let customAsset5Type = inputValues['custom-asset-5'];
+    // Custom asset statuses (roth, traditional, none)
+    let customAsset1Status = inputValues['custom-status-1'];
+    let customAsset2Status = inputValues['custom-status-2'];
+    let customAsset3Status = inputValues['custom-status-3'];
+    let customAsset4Status = inputValues['custom-status-4'];
+    let customAsset5Status = inputValues['custom-status-5'];
+    // Custom asset balances
+    const customAsset1Balance = {};
+    const customAsset2Balance = {};
+    const customAsset3Balance = {};
+    const customAsset4Balance = {};
+    const customAsset5Balance = {};
+    // Custom assets sold
+    const customAsset1Sold = {};
+    const customAsset2Sold = {};
+    const customAsset3Sold = {};
+    const customAsset4Sold = {};
+    const customAsset5Sold = {};
+
+    if (isSimulation) {
+      // Override asset statuses for simulation
+      customAsset1Status =
+        (customAsset1Status === 'traditional' && customAsset1Type === 'btc') || (customAsset1Status !== 'none' && customAsset1Type !== 'btc')
+          ? 'roth'
+          : inputValues['custom-status-1'];
+
+      customAsset2Status =
+        (customAsset2Status === 'traditional' && customAsset2Type === 'btc') || (customAsset2Status !== 'none' && customAsset2Type !== 'btc')
+          ? 'roth'
+          : inputValues['custom-status-2'];
+
+      customAsset3Status =
+        (customAsset3Status === 'traditional' && customAsset3Type === 'btc') || (customAsset3Status !== 'none' && customAsset3Type !== 'btc')
+          ? 'roth'
+          : inputValues['custom-status-3'];
+      customAsset4Status =
+        (customAsset4Status === 'traditional' && customAsset4Type === 'btc') || (customAsset4Status !== 'none' && customAsset4Type !== 'btc')
+          ? 'roth'
+          : inputValues['custom-status-4'];
+
+      customAsset5Status =
+        (customAsset5Status === 'traditional' && customAsset5Type === 'btc') || (customAsset5Status !== 'none' && customAsset5Type !== 'btc')
+          ? 'roth'
+          : inputValues['custom-status-5'];
+
+      // Override asset types for simulation
+      customAsset1Type = customAsset1Status === 'roth' ? 'btc' : inputValues['custom-asset-1'];
+      customAsset2Type = customAsset2Status === 'roth' ? 'btc' : inputValues['custom-asset-2'];
+      customAsset3Type = customAsset3Status === 'roth' ? 'btc' : inputValues['custom-asset-3'];
+      customAsset4Type = customAsset4Status === 'roth' ? 'btc' : inputValues['custom-asset-4'];
+      customAsset5Type = customAsset5Status === 'roth' ? 'btc' : inputValues['custom-asset-5'];
+    }
+    if (!isSimulation) {
+      let totalBtcRoth =
+        (customAsset1Status === 'roth' && customAsset1Type === 'btc' ? customAsset1 : 0) +
+        (customAsset2Status === 'roth' && customAsset2Type === 'btc' ? customAsset2 : 0) +
+        (customAsset3Status === 'roth' && customAsset3Type === 'btc' ? customAsset3 : 0) +
+        (customAsset4Status === 'roth' && customAsset4Type === 'btc' ? customAsset4 : 0) +
+        (customAsset5Status === 'roth' && customAsset5Type === 'btc' ? customAsset5 : 0);
+      let totalCustomAssets = customAsset1 + customAsset2 + customAsset3 + customAsset4 + customAsset5;
+      let assetsThatWillConvertInSim =
+        ((customAsset1Status === 'traditional' && customAsset1Type === 'btc') || (customAsset1Status !== 'none' && customAsset1Type !== 'btc')
+          ? customAsset1 === 0
+            ? 1
+            : customAsset1
+          : 0) +
+        ((customAsset2Status === 'traditional' && customAsset2Type === 'btc') || (customAsset2Status !== 'none' && customAsset2Type !== 'btc')
+          ? customAsset2 === 0
+            ? 1
+            : customAsset2
+          : 0) +
+        ((customAsset3Status === 'traditional' && customAsset3Type === 'btc') || (customAsset3Status !== 'none' && customAsset3Type !== 'btc')
+          ? customAsset3 === 0
+            ? 1
+            : customAsset3
+          : 0) +
+        ((customAsset4Status === 'traditional' && customAsset4Type === 'btc') || (customAsset4Status !== 'none' && customAsset4Type !== 'btc')
+          ? customAsset4 === 0
+            ? 1
+            : customAsset4
+          : 0) +
+        ((customAsset5Status === 'traditional' && customAsset5Type === 'btc') || (customAsset5Status !== 'none' && customAsset5Type !== 'btc')
+          ? customAsset5 === 0
+            ? 1
+            : customAsset5
+          : 0);
+      // If gold line is equal to normal, have are custom assets and are in BTC Roth(dashed line)
+      if (totalCustomAssets > 0 && totalBtcRoth === assetsThatWillConvertInSim) goldLineEqual = displayGoldLine = true;
+      // Some assets will convert to BTC Roth
+      else if (assetsThatWillConvertInSim > 0) {
+        goldLineEqual = false;
+        displayGoldLine = true;
+      } else {
+        goldLineEqual = false;
+        displayGoldLine = false;
+      }
+    }
 
     // Initialize first year
-    totalBalances[currentYear] = initialBondsBalance + initialStocksBalance + initialBtcBalance + initialCashBalance;
+    totalBalances[currentYear] =
+      initialBondsBalance + initialStocksBalance + initialBtcBalance + customAsset1 + customAsset2 + customAsset3 + customAsset4 + customAsset5;
+
     btcBalance[currentYear] = initialBtcBalance;
     stocksBalance[currentYear] = initialStocksBalance;
     bondsBalance[currentYear] = initialBondsBalance;
-    cashIncomeBalance[currentYear] = initialCashBalance;
+    customAsset1Balance[currentYear] = customAsset1;
+    customAsset2Balance[currentYear] = customAsset2;
+    customAsset3Balance[currentYear] = customAsset3;
+    customAsset4Balance[currentYear] = customAsset4;
+    customAsset5Balance[currentYear] = customAsset5;
+    // Reset customBtc assets and add starting balance
+    if (!isSimulation) {
+      customBtcAssets = {};
+      customBtcAssets[currentYear] =
+        (customAsset1Type === 'btc' ? customAsset1 : 0) +
+        (customAsset2Type === 'btc' ? customAsset2 : 0) +
+        (customAsset3Type === 'btc' ? customAsset3 : 0) +
+        (customAsset4Type === 'btc' ? customAsset4 : 0) +
+        (customAsset5Type === 'btc' ? customAsset5 : 0);
+    }
 
     // Starting balances for 60/40 portfolio
     portfolio60_40[currentYear] = totalBalances[currentYear];
+    portfolio60_40Stocks[currentYear] = totalBalances[currentYear] * 0.6;
+    portfolio60_40Bonds[currentYear] = totalBalances[currentYear] * 0.4;
 
     for (let i = 1; i <= expectancy; i++) {
       const localCurrentYear = currentYear + i;
+      const localAge = currentAge + i;
       const btcPrice = btcPrices[localCurrentYear];
       const previousTotalBalance = totalBalances[localCurrentYear - 1] || 0;
+      // console.log('In year', localCurrentYear);
+      const logResults = logResultsF && localAge <= inputValues['expectancy'];
 
       let yearBtcSold = 0;
       let yearStocksSold = 0;
       let yearBondsSold = 0;
-      const netWithdrawal = withdrawalsNeeded[localCurrentYear] - otherIncome[localCurrentYear] || 0;
-      // const netWithdrawal = Math.max(withdrawalsNeeded[localCurrentYear] - otherIncome[localCurrentYear]);
+      let yearCustomAsset1Sold = 0;
+      let yearCustomAsset2Sold = 0;
+      let yearCustomAsset3Sold = 0;
+      let yearCustomAsset4Sold = 0;
+      let yearCustomAsset5Sold = 0;
+      const netWithdrawal = Math.max(withdrawalsNeeded[localCurrentYear] - otherIncome[localCurrentYear - 1] || 0, 0);
 
+      const surplusWithdrawal = Math.max(otherIncome[localCurrentYear - 1] - withdrawalsNeeded[localCurrentYear], 0);
+
+      // In retirement and has balance
       if (localCurrentYear > yearOfRetirement && previousTotalBalance > 0) {
         // Calculate the difference between needed withdrawals and other income
 
         if (netWithdrawal !== 0) {
-          // Calculate proportions based on previous year's balances
           const previousBtcBalance = btcBalance[localCurrentYear - 1] || 0;
           const previousStocksBalance = stocksBalance[localCurrentYear - 1] || 0;
           const previousBondsBalance = bondsBalance[localCurrentYear - 1] || 0;
+          const previousCustomAsset1Balance = customAsset1Balance[localCurrentYear - 1] || 0;
+          const previousCustomAsset2Balance = customAsset2Balance[localCurrentYear - 1] || 0;
+          const previousCustomAsset3Balance = customAsset3Balance[localCurrentYear - 1] || 0;
+          const previousCustomAsset4Balance = customAsset4Balance[localCurrentYear - 1] || 0;
+          const previousCustomAsset5Balance = customAsset5Balance[localCurrentYear - 1] || 0;
 
-          // Avoid division by zero by checking if there's any balance
-          if (previousTotalBalance > 0) {
-            const btcProportion = previousBtcBalance / previousTotalBalance;
-            const stocksProportion = previousStocksBalance / previousTotalBalance;
-            const bondsProportion = previousBondsBalance / previousTotalBalance;
+          const nonRothAssets = Math.max(
+            previousTotalBalance -
+              (customAsset1Status === 'roth' ? previousCustomAsset1Balance : 0) -
+              (customAsset2Status === 'roth' ? previousCustomAsset2Balance : 0) -
+              (customAsset3Status === 'roth' ? previousCustomAsset3Balance : 0) -
+              (customAsset4Status === 'roth' ? previousCustomAsset4Balance : 0) -
+              (customAsset5Status === 'roth' ? previousCustomAsset5Balance : 0),
+            0
+          );
+          const rothAssets = Math.max(previousTotalBalance - nonRothAssets, 0);
 
-            // Calculate changes proportionally
-            yearBtcSold = netWithdrawal * btcProportion;
-            yearStocksSold = netWithdrawal * stocksProportion;
-            yearBondsSold = netWithdrawal * bondsProportion;
+          if (logResults) {
+            // console.log(`Age ${localAge} before selling:
+            // Total balance: ${formatCurrency(previousTotalBalance)}
+            // Non-roth assets: ${formatCurrency(nonRothAssets)}
+            // Roth assets: ${formatCurrency(rothAssets)}
+            // Withdrawal: ${formatCurrency(netWithdrawal)}`);
+          }
 
-            // If we need to withdraw (positive netWithdrawal), ensure we don't withdraw more than available
+          // Sell proportionally
+          if (localAge >= 60 || (localAge < 60 && nonRothAssets >= netWithdrawal)) {
+            isTaxPenalty = false;
+            if (logResults) {
+              // console.log(
+              //   'Age >= 60 or age < 60 and enough non-roth assets, no penalty, sell proportionally. Selling roth assets only after age 60.'
+              // );
+            }
+            let remainingWithdrawal = netWithdrawal;
+
+            //  filtering out undefined balances
+            const assets = [
+              { balance: previousBtcBalance || 0, proportion: 0, sold: 0 },
+              { balance: previousStocksBalance || 0, proportion: 0, sold: 0 },
+              { balance: previousBondsBalance || 0, proportion: 0, sold: 0 },
+              { balance: previousCustomAsset1Balance || 0, proportion: 0, sold: 0, include: customAsset1Status !== 'roth' || localAge >= 60 },
+              { balance: previousCustomAsset2Balance || 0, proportion: 0, sold: 0, include: customAsset2Status !== 'roth' || localAge >= 60 },
+              { balance: previousCustomAsset3Balance || 0, proportion: 0, sold: 0, include: customAsset3Status !== 'roth' || localAge >= 60 },
+              { balance: previousCustomAsset4Balance || 0, proportion: 0, sold: 0, include: customAsset4Status !== 'roth' || localAge >= 60 },
+              { balance: previousCustomAsset5Balance || 0, proportion: 0, sold: 0, include: customAsset5Status !== 'roth' || localAge >= 60 },
+            ].filter((asset) => asset.balance > 0 && asset.include !== false);
+
+            // Calculate total available balance
+            const totalAvailable = assets.reduce((sum, asset) => sum + asset.balance, 0);
+
+            if (totalAvailable > 0) {
+              // Calculate initial proportions
+              assets.forEach((asset) => {
+                asset.proportion = asset.balance / totalAvailable;
+              });
+
+              // Calculate ideal proportional sales
+              assets.forEach((asset) => {
+                const targetSale = remainingWithdrawal * asset.proportion;
+                asset.sold = Math.min(targetSale, asset.balance);
+              });
+
+              // Distribute any remaining withdrawal needed
+              const totalSold = assets.reduce((sum, asset) => sum + asset.sold, 0);
+              if (totalSold < remainingWithdrawal) {
+                const remaining = remainingWithdrawal - totalSold;
+
+                // Find assets that still have available balance
+                const availableAssets = assets.filter((asset) => asset.sold < asset.balance);
+
+                if (availableAssets.length > 0) {
+                  const remainingTotal = availableAssets.reduce((sum, asset) => sum + (asset.balance - asset.sold), 0);
+
+                  availableAssets.forEach((asset) => {
+                    const proportion = (asset.balance - asset.sold) / remainingTotal;
+                    const additional = Math.min(remaining * proportion, asset.balance - asset.sold);
+                    asset.sold += additional;
+                  });
+                }
+              }
+            }
+
+            // Assign results back to variables
+            yearBtcSold = assets.find((a) => a.balance === previousBtcBalance)?.sold || 0;
+            yearStocksSold = assets.find((a) => a.balance === previousStocksBalance)?.sold || 0;
+            yearBondsSold = assets.find((a) => a.balance === previousBondsBalance)?.sold || 0;
+            yearCustomAsset1Sold = assets.find((a) => a.balance === previousCustomAsset1Balance)?.sold || 0;
+            yearCustomAsset2Sold = assets.find((a) => a.balance === previousCustomAsset2Balance)?.sold || 0;
+            yearCustomAsset3Sold = assets.find((a) => a.balance === previousCustomAsset3Balance)?.sold || 0;
+            yearCustomAsset4Sold = assets.find((a) => a.balance === previousCustomAsset4Balance)?.sold || 0;
+            yearCustomAsset5Sold = assets.find((a) => a.balance === previousCustomAsset5Balance)?.sold || 0;
+
+            // If we need to withdraw (positive netWithdrawal)
             if (netWithdrawal > 0) {
               yearBtcSold = Math.min(yearBtcSold, previousBtcBalance);
               yearStocksSold = Math.min(yearStocksSold, previousStocksBalance);
               yearBondsSold = Math.min(yearBondsSold, previousBondsBalance);
+              yearCustomAsset1Sold = Math.min(yearCustomAsset1Sold, customAsset1Balance[localCurrentYear - 1]);
+              yearCustomAsset2Sold = Math.min(yearCustomAsset2Sold, customAsset2Balance[localCurrentYear - 1]);
+              yearCustomAsset3Sold = Math.min(yearCustomAsset3Sold, customAsset3Balance[localCurrentYear - 1]);
+              yearCustomAsset4Sold = Math.min(yearCustomAsset4Sold, customAsset4Balance[localCurrentYear - 1]);
+              yearCustomAsset5Sold = Math.min(yearCustomAsset5Sold, customAsset5Balance[localCurrentYear - 1]);
+            }
+          } else {
+            if (logResults) {
+              // console.log('Age < 60 and not enough non-roth assets, tax penalty, sell all non-roth assets and roth assets proportionally');
+            }
+            isTaxPenalty = true;
+            // Step 1: Initialize assets with their status
+            const assets = [
+              { name: 'btc', balance: previousBtcBalance || 0, isRoth: false },
+              { name: 'stocks', balance: previousStocksBalance || 0, isRoth: false },
+              { name: 'bonds', balance: previousBondsBalance || 0, isRoth: false },
+              { name: 'custom1', balance: previousCustomAsset1Balance || 0, isRoth: customAsset1Status === 'roth' },
+              { name: 'custom2', balance: previousCustomAsset2Balance || 0, isRoth: customAsset2Status === 'roth' },
+              { name: 'custom3', balance: previousCustomAsset3Balance || 0, isRoth: customAsset3Status === 'roth' },
+              { name: 'custom4', balance: previousCustomAsset4Balance || 0, isRoth: customAsset4Status === 'roth' },
+              { name: 'custom5', balance: previousCustomAsset5Balance || 0, isRoth: customAsset5Status === 'roth' },
+            ].filter((asset) => asset.balance > 0);
+
+            let remainingWithdrawal = netWithdrawal;
+            assets.forEach((asset) => (asset.sold = 0));
+
+            // Sell only what we need from non-Roth assets
+            const nonRothAssets = assets.filter((asset) => !asset.isRoth);
+            const totalNonRothBalance = nonRothAssets.reduce((sum, asset) => sum + asset.balance, 0);
+
+            if (totalNonRothBalance > 0) {
+              const amountToSell = Math.min(remainingWithdrawal, totalNonRothBalance);
+              nonRothAssets.forEach((asset) => {
+                const proportion = asset.balance / totalNonRothBalance;
+                asset.sold = Math.min(amountToSell * proportion, asset.balance);
+              });
+              remainingWithdrawal -= nonRothAssets.reduce((sum, asset) => sum + asset.sold, 0);
+            }
+
+            // If more withdrawal needed, calculate tax-adjusted amount for Roth assets
+            if (remainingWithdrawal > 0) {
+              const rothWithdrawal = remainingWithdrawal * 1.3; // Apply 30% tax+penalty adjustment
+              const rothAssets = assets.filter((asset) => asset.isRoth);
+              const totalRothBalance = rothAssets.reduce((sum, asset) => sum + asset.balance, 0);
+
+              if (totalRothBalance > 0) {
+                const amountToSell = Math.min(rothWithdrawal, totalRothBalance);
+                rothAssets.forEach((asset) => {
+                  const proportion = asset.balance / totalRothBalance;
+                  asset.sold = Math.min(amountToSell * proportion, asset.balance);
+                });
+              }
+            }
+
+            // Assign results back to variables
+            yearBtcSold = assets.find((a) => a.name === 'btc')?.sold || 0;
+            yearStocksSold = assets.find((a) => a.name === 'stocks')?.sold || 0;
+            yearBondsSold = assets.find((a) => a.name === 'bonds')?.sold || 0;
+            yearCustomAsset1Sold = assets.find((a) => a.name === 'custom1')?.sold || 0;
+            yearCustomAsset2Sold = assets.find((a) => a.name === 'custom2')?.sold || 0;
+            yearCustomAsset3Sold = assets.find((a) => a.name === 'custom3')?.sold || 0;
+            yearCustomAsset4Sold = assets.find((a) => a.name === 'custom4')?.sold || 0;
+            yearCustomAsset5Sold = assets.find((a) => a.name === 'custom5')?.sold || 0;
+
+            if (logResults) {
+              // console.log(`Selling with tax penalty:
+              // Remaining withdrawal for roth assets: ${formatCurrency(netWithdrawal - nonRothAssets)}
+              // Remaining withdrawal for roth assets with tax penalty: ${formatCurrency(remainingWithdrawal)}
+              // BTC: ${formatCurrency(yearBtcSold)}
+              // Stocks: ${formatCurrency(yearStocksSold)}
+              // Bonds: ${formatCurrency(yearBondsSold)}
+              // Custom 1: ${formatCurrency(yearCustomAsset1Sold)}
+              // Custom 2: ${formatCurrency(yearCustomAsset2Sold)}
+              // Custom 3: ${formatCurrency(yearCustomAsset3Sold)}
+              // Custom 4: ${formatCurrency(yearCustomAsset4Sold)}
+              // Custom 5: ${formatCurrency(yearCustomAsset5Sold)}
+              // Total sold: ${formatCurrency(
+              //   yearBtcSold +
+              //     yearStocksSold +
+              //     yearBondsSold +
+              //     yearCustomAsset1Sold +
+              //     yearCustomAsset2Sold +
+              //     yearCustomAsset3Sold +
+              //     yearCustomAsset4Sold +
+              //     yearCustomAsset5Sold
+              // )}`);
+            }
+
+            // If we need to withdraw (positive netWithdrawal)
+            if (netWithdrawal > 0) {
+              yearBtcSold = Math.min(yearBtcSold, previousBtcBalance);
+              yearStocksSold = Math.min(yearStocksSold, previousStocksBalance);
+              yearBondsSold = Math.min(yearBondsSold, previousBondsBalance);
+              yearCustomAsset1Sold = Math.min(yearCustomAsset1Sold, customAsset1Balance[localCurrentYear - 1]);
+              yearCustomAsset2Sold = Math.min(yearCustomAsset2Sold, customAsset2Balance[localCurrentYear - 1]);
+              yearCustomAsset3Sold = Math.min(yearCustomAsset3Sold, customAsset3Balance[localCurrentYear - 1]);
+              yearCustomAsset4Sold = Math.min(yearCustomAsset4Sold, customAsset4Balance[localCurrentYear - 1]);
+              yearCustomAsset5Sold = Math.min(yearCustomAsset5Sold, customAsset5Balance[localCurrentYear - 1]);
             }
           }
         }
+      } else {
+        // if not retired yet and netWithdrawal > expenses, add to total balance
+        if (netWithdrawal > 0 && previousTotalBalance > 0) {
+          // console.log('Adding surplus to total balance', Math.abs(netWithdrawal));
+          // totalBalances[localCurrentYear] = previousTotalBalance + Math.abs(netWithdrawal);
+        }
       }
-
+      // console.log('previousTotalBalance', previousTotalBalance);
       if (previousTotalBalance > 0) {
         // Record the withdrawals/additions
         btcSold[localCurrentYear] = -yearBtcSold;
         stocksSold[localCurrentYear] = -yearStocksSold;
         bondsSold[localCurrentYear] = -yearBondsSold;
+        customAsset1Sold[localCurrentYear] = -yearCustomAsset1Sold;
+        customAsset2Sold[localCurrentYear] = -yearCustomAsset2Sold;
+        customAsset3Sold[localCurrentYear] = -yearCustomAsset3Sold;
+        customAsset4Sold[localCurrentYear] = -yearCustomAsset4Sold;
+        customAsset5Sold[localCurrentYear] = -yearCustomAsset5Sold;
 
         // Calculate new balances with growth and additions
         const btcGrowthFactor = btcPrice / btcPrices[localCurrentYear - 1];
@@ -897,93 +1641,267 @@ const runCalculations = () => {
           (annualBondsSavings[localCurrentYear] || 0) +
           bondsSold[localCurrentYear];
 
-        cashIncomeBalance[localCurrentYear] =
-          (cashIncomeBalance[localCurrentYear - 1] || 0) * (1 + cashGrowthRate / 100) + (annualCashSavings[localCurrentYear] || 0);
+        // Custom assets
+        customAsset1Balance[localCurrentYear] =
+          (customAsset1Balance[localCurrentYear - 1] || 0) * getGrowthFactor(customAsset1Type, btcGrowthFactor) +
+          (annualCustomAsset1Savings[localCurrentYear] || 0) +
+          customAsset1Sold[localCurrentYear];
 
-        // Calculate total balance
-        totalBalances[localCurrentYear] = Math.max(
-          btcBalance[localCurrentYear] +
-            stocksBalance[localCurrentYear] +
-            bondsBalance[localCurrentYear] +
-            cashIncomeBalance[localCurrentYear] -
-            Math.max(netWithdrawal, 0),
-          0
-        );
+        customAsset2Balance[localCurrentYear] =
+          (customAsset2Balance[localCurrentYear - 1] || 0) * getGrowthFactor(customAsset2Type, btcGrowthFactor) +
+          (annualCustomAsset2Savings[localCurrentYear] || 0) +
+          customAsset2Sold[localCurrentYear];
+
+        customAsset3Balance[localCurrentYear] =
+          (customAsset3Balance[localCurrentYear - 1] || 0) * getGrowthFactor(customAsset3Type, btcGrowthFactor) +
+          (annualCustomAsset3Savings[localCurrentYear] || 0) +
+          customAsset3Sold[localCurrentYear];
+
+        customAsset4Balance[localCurrentYear] =
+          (customAsset4Balance[localCurrentYear - 1] || 0) * getGrowthFactor(customAsset4Type, btcGrowthFactor) +
+          (annualCustomAsset4Savings[localCurrentYear] || 0) +
+          customAsset4Sold[localCurrentYear];
+
+        customAsset5Balance[localCurrentYear] =
+          (customAsset5Balance[localCurrentYear - 1] || 0) * getGrowthFactor(customAsset5Type, btcGrowthFactor) +
+          (annualCustomAsset5Savings[localCurrentYear] || 0) +
+          customAsset5Sold[localCurrentYear];
+        // if (!isSimulation) console.log(getGrowthFactor(customAsset1Type, btcGrowthFactor));
+        // if (!isSimulation) {
+        //   console.log(
+        //     `${localCurrentYear}, Custom asset 1:
+        //     Previous balance: ${formatCurrency(customAsset1Balance[localCurrentYear - 1])},
+        //     Growth factor: ${getGrowthFactor(customAsset1Type, btcGrowthFactor)},
+        //     Savings: ${annualCustomAsset1Savings[localCurrentYear]},
+        //     Sold: ${customAsset1Sold[localCurrentYear]},
+        //     Previous year with growth: ${formatCurrency(
+        //       customAsset1Balance[localCurrentYear - 1] * getGrowthFactor(customAsset1Type, btcGrowthFactor)
+        //     )},
+        //       Previuos year with savings: ${formatCurrency(customAsset1Balance[localCurrentYear - 1] + annualCustomAsset1Savings[localCurrentYear])},
+        //       Current year: ${formatCurrency(customAsset1Balance[localCurrentYear])}`
+        //   );
+        // }
+
+        // customAsset1Balance[localCurrentYear] = getCustomAssetBalance(
+        //   customAsset1Type,
+        //   customAsset1Balance[localCurrentYear - 1],
+        //   annualCustomAsset1Savings[localCurrentYear],
+        //   customAsset1Sold[localCurrentYear],
+        //   btcGrowthFactor
+        // );
+        // customAsset2Balance[localCurrentYear] = getCustomAssetBalance(
+        //   customAsset2Type,
+        //   customAsset2Balance[localCurrentYear - 1],
+        //   annualCustomAsset2Savings[localCurrentYear],
+        //   customAsset2Sold[localCurrentYear],
+        //   btcGrowthFactor
+        // );
+        // customAsset3Balance[localCurrentYear] = getCustomAssetBalance(
+        //   customAsset3Type,
+        //   customAsset3Balance[localCurrentYear - 1],
+        //   annualCustomAsset3Savings[localCurrentYear],
+        //   customAsset3Sold[localCurrentYear],
+        //   btcGrowthFactor
+        // );
+        // customAsset4Balance[localCurrentYear] = getCustomAssetBalance(
+        //   customAsset4Type,
+        //   customAsset4Balance[localCurrentYear - 1],
+        //   annualCustomAsset4Savings[localCurrentYear],
+        //   customAsset4Sold[localCurrentYear],
+        //   btcGrowthFactor
+        // );
+        // customAsset5Balance[localCurrentYear] = getCustomAssetBalance(
+        //   customAsset5Type,
+        //   customAsset5Balance[localCurrentYear - 1],
+        //   annualCustomAsset5Savings[localCurrentYear],
+        //   customAsset5Sold[localCurrentYear],
+        //   btcGrowthFactor
+        // );
+
+        // Custom BTC balance
+        if (!isSimulation) {
+          customBtcAssets[localCurrentYear] =
+            (customAsset1Type === 'btc' ? customAsset1Balance[localCurrentYear] : 0) +
+            (customAsset2Type === 'btc' ? customAsset2Balance[localCurrentYear] : 0) +
+            (customAsset3Type === 'btc' ? customAsset3Balance[localCurrentYear] : 0) +
+            (customAsset4Type === 'btc' ? customAsset4Balance[localCurrentYear] : 0) +
+            (customAsset5Type === 'btc' ? customAsset5Balance[localCurrentYear] : 0);
+        }
+
+        if (previousTotalBalance > netWithdrawal) {
+          totalBalances[localCurrentYear] = Math.max(
+            btcBalance[localCurrentYear] +
+              stocksBalance[localCurrentYear] +
+              bondsBalance[localCurrentYear] +
+              customAsset1Balance[localCurrentYear] +
+              customAsset2Balance[localCurrentYear] +
+              customAsset3Balance[localCurrentYear] +
+              customAsset4Balance[localCurrentYear] +
+              customAsset5Balance[localCurrentYear]
+          );
+          // if (previousTotalBalance > netWithdrawal) {
+          //   totalBalances[localCurrentYear] = Math.max(
+          //     btcBalance[localCurrentYear] +
+          //       stocksBalance[localCurrentYear] +
+          //       bondsBalance[localCurrentYear] +
+          //       customAsset1Balance[localCurrentYear] +
+          //       customAsset2Balance[localCurrentYear] +
+          //       customAsset3Balance[localCurrentYear] +
+          //       customAsset4Balance[localCurrentYear] +
+          //       customAsset5Balance[localCurrentYear] -
+          //       Math.max(netWithdrawal, 0),
+          //     0
+          //   );
+
+          if (logResults) {
+            // console.log(`
+            //   totalBalances: ${formatCurrency(totalBalances[localCurrentYear])}
+            //    calculated totalBalances: ${formatCurrency(
+            //      btcBalance[localCurrentYear] +
+            //        stocksBalance[localCurrentYear] +
+            //        bondsBalance[localCurrentYear] +
+            //        customAsset1Balance[localCurrentYear] +
+            //        customAsset2Balance[localCurrentYear] +
+            //        customAsset3Balance[localCurrentYear] +
+            //        customAsset4Balance[localCurrentYear] +
+            //        customAsset5Balance[localCurrentYear]
+            //    )}
+            //   previousTotalBalance: ${formatCurrency(previousTotalBalance)}
+            //   calculated previousTotalBalance: ${formatCurrency(
+            //     btcBalance[localCurrentYear - 1] +
+            //       stocksBalance[localCurrentYear - 1] +
+            //       bondsBalance[localCurrentYear - 1] +
+            //       customAsset1Balance[localCurrentYear - 1] +
+            //       customAsset2Balance[localCurrentYear - 1] +
+            //       customAsset3Balance[localCurrentYear - 1] +
+            //       customAsset4Balance[localCurrentYear - 1] +
+            //       customAsset5Balance[localCurrentYear - 1]
+            //   )}
+            //   netWithdrawal: ${formatCurrency(netWithdrawal)}
+            //   calculated netWithdrawal: ${formatCurrency(
+            //     btcSold[localCurrentYear] +
+            //       stocksSold[localCurrentYear] +
+            //       bondsSold[localCurrentYear] +
+            //       customAsset1Sold[localCurrentYear] +
+            //       customAsset2Sold[localCurrentYear] +
+            //       customAsset3Sold[localCurrentYear] +
+            //       customAsset4Sold[localCurrentYear] +
+            //       customAsset5Sold[localCurrentYear]
+            //   )}
+            //   `);
+          }
+        } else {
+          totalBalances[localCurrentYear] = 0;
+        }
+
         // console.log('Total balance:', totalBalances[localCurrentYear]);
       } else {
         // If there's no previous balance, set everything to 0
         btcBalance[localCurrentYear] = 0;
         stocksBalance[localCurrentYear] = 0;
         bondsBalance[localCurrentYear] = 0;
-        cashIncomeBalance[localCurrentYear] = 0;
         totalBalances[localCurrentYear] = 0;
+        customAsset1Balance[localCurrentYear] = 0;
+        customAsset2Balance[localCurrentYear] = 0;
+        customAsset3Balance[localCurrentYear] = 0;
+        customAsset4Balance[localCurrentYear] = 0;
+        customAsset5Balance[localCurrentYear] = 0;
       }
 
       // Retirement success status
-      if (totalBalances[localCurrentYear] <= 0) retirementSuccessStatus[localCurrentYear] = false;
-      else retirementSuccessStatus[localCurrentYear] = true;
+      if (previousTotalBalance > netWithdrawal) retirementSuccessStatus[localCurrentYear] = true;
+      else retirementSuccessStatus[localCurrentYear] = false;
 
-      // Calculate 60% in stocks/40% in bonds portfolio
-      const previousStocksValue = portfolio60_40[localCurrentYear - 1] * 0.6;
-      const currentStocksValue =
-        previousStocksValue * (1 + stocksGrowthRate / 100) + (annualStocksSavings[localCurrentYear] || 0) + stocksSold[localCurrentYear];
+      // Add retirement income if in retirement
+      // if (localCurrentYear > yearOfRetirement) portfolio60_40[localCurrentYear] += netWithdrawal;
 
-      // Calculate current value of bonds (40% of portfolio)
-      const previousBondsValue = portfolio60_40[localCurrentYear - 1] * 0.4;
-      const currentBondsValue =
-        previousBondsValue * (1 + bondsGrowthRate / 100) + (annualBondsSavings[localCurrentYear] || 0) + bondsSold[localCurrentYear];
+      // Calculate new 60/40 values with growth
+      const currentStocksValue = portfolio60_40Stocks[localCurrentYear - 1];
+      const currentBondsValue = portfolio60_40Bonds[localCurrentYear - 1];
+      const portfolioValue = currentStocksValue + currentBondsValue;
+      const stockProportion = currentStocksValue / portfolioValue;
+      const bondProportion = currentBondsValue / portfolioValue;
+
+      // Sell equal proportions of stocks and bonds
+      const stocksWithdrawal = netWithdrawal * stockProportion;
+      const bondsWithdrawal = netWithdrawal * bondProportion;
 
       // Start selling 60_40 portfolio after retirement
       if (localCurrentYear > yearOfRetirement) {
-        const portfolioValue = currentStocksValue + currentBondsValue;
-        const portfolioWithdrawal = netWithdrawal * (portfolioValue / totalBalances[localCurrentYear]);
-        const stocksWithdrawal = portfolioWithdrawal * 0.6;
-        const bondsWithdrawal = portfolioWithdrawal * 0.4;
-
-        // Calculate new with growth minus withdrawals
-        if (portfolio60_40[localCurrentYear - 1] > 0 && withdrawalsNeeded[localCurrentYear] < portfolioValue) {
-          const newStocksValue = currentStocksValue - stocksWithdrawal;
-          const newBondsValue = currentBondsValue - bondsWithdrawal;
-          // Calculate new total portfolio value, minimum 0
-          portfolio60_40[localCurrentYear] = Math.max(newStocksValue + newBondsValue, 0);
+        // Withdraw from 60/40 portfolio
+        if (portfolio60_40[localCurrentYear - 1] > 0 && netWithdrawal < portfolioValue) {
+          portfolio60_40Stocks[localCurrentYear] = currentStocksValue * (1 + stocksGrowthRate / 100) - stocksWithdrawal;
+          portfolio60_40Bonds[localCurrentYear] = currentBondsValue * (1 + bondsGrowthRate / 100) - bondsWithdrawal;
+          // Calculate new total portfolio value
+          portfolio60_40[localCurrentYear] = Math.max(portfolio60_40Stocks[localCurrentYear] + portfolio60_40Bonds[localCurrentYear], 0);
         } else {
           portfolio60_40[localCurrentYear] = 0;
         }
       } else {
-        portfolio60_40[localCurrentYear] = currentStocksValue + currentBondsValue;
+        portfolio60_40Stocks[localCurrentYear] = currentStocksValue * (1 + stocksGrowthRate / 100);
+        portfolio60_40Bonds[localCurrentYear] = currentBondsValue * (1 + bondsGrowthRate / 100);
+        portfolio60_40[localCurrentYear] = Math.max(portfolio60_40Stocks[localCurrentYear] + portfolio60_40Bonds[localCurrentYear], 0);
       }
-
       // Add validation and logging
       if (isNaN(totalBalances[localCurrentYear])) {
         console.error('NaN detected in year:', localCurrentYear, {
           btcBalance: btcBalance[localCurrentYear],
           stocksBalance: stocksBalance[localCurrentYear],
           bondsBalance: bondsBalance[localCurrentYear],
-          cashBalance: cashIncomeBalance[localCurrentYear],
+          totalBalance: totalBalances[localCurrentYear],
           btcPrice,
           previousBtcPrice: btcPrices[localCurrentYear - 1],
+          previousTotalBalance,
+          netWithdrawal,
           withdrawals: {
             btc: btcSold[localCurrentYear],
             stocks: stocksSold[localCurrentYear],
             bonds: bondsSold[localCurrentYear],
+            custom1: customAsset1Sold[localCurrentYear],
+            custom2: customAsset2Sold[localCurrentYear],
+            custom3: customAsset3Sold[localCurrentYear],
+            custom4: customAsset4Sold[localCurrentYear],
+            custom5: customAsset5Sold[localCurrentYear],
           },
         });
       }
-      // if (logResults) {
-      //   console.log(`Year ${localCurrentYear},  Total Balance: ${formatCurrency(totalBalances[localCurrentYear])}, Total withdrawal: ${formatCurrency(
-      //     netWithdrawal
-      //   )} \n
-      //   BTC Balance: ${formatCurrency(btcBalance[localCurrentYear])}, withdrawal: ${formatCurrency(
-      //     btcSold[localCurrentYear],
-      //     2
-      //   )}, price: ${formatCurrency(btcPrice)} \n
-      //   Stocks Balance: ${formatCurrency(stocksBalance[localCurrentYear])}, withdrawal: ${formatCurrency(stocksSold[localCurrentYear])} \n
-      //   Bonds Balance: ${formatCurrency(bondsBalance[localCurrentYear])}, withdrawal: ${formatCurrency(bondsSold[localCurrentYear])} \n
-      //   Cash Balance: ${formatCurrency(cashIncomeBalance[localCurrentYear])} \n
-      //   60/40 Portfolio: ${formatCurrency(portfolio60_40[localCurrentYear])} \n
-      //   Retirement Success: ${retirementSuccessStatus[localCurrentYear] ? 'Yes' : 'No'} \n
-      //   `);
-      // }
+      if (false) {
+        // if (logResults) {
+        console.log(`Year ${localCurrentYear}, Age: ${inputValues['current-age'] + i}
+        Balance: ${formatCurrency(totalBalances[localCurrentYear])}, Other income: ${formatCurrency(otherIncome[localCurrentYear - 1])} 
+        Withdrawal needed: ${formatCurrency(withdrawalsNeeded[localCurrentYear])}, Net withdrawal: ${formatCurrency(netWithdrawal)}
+        Withdrawed: ${formatCurrency(
+          btcSold[localCurrentYear] +
+            stocksSold[localCurrentYear] +
+            bondsSold[localCurrentYear] +
+            customAsset1Sold[localCurrentYear] +
+            customAsset2Sold[localCurrentYear] +
+            customAsset3Sold[localCurrentYear] +
+            customAsset4Sold[localCurrentYear] +
+            customAsset5Sold[localCurrentYear]
+        )}
+        Roth tax penalty: ${isTaxPenalty}
+        Custom asset 1: ${formatCurrency(customAsset1Balance[localCurrentYear])}, withdrawal: ${formatCurrency(customAsset1Sold[localCurrentYear])}
+        Custom asset 2: ${formatCurrency(customAsset2Balance[localCurrentYear])}, withdrawal: ${formatCurrency(customAsset2Sold[localCurrentYear])}
+        Custom asset 3: ${formatCurrency(customAsset3Balance[localCurrentYear])}, withdrawal: ${formatCurrency(customAsset3Sold[localCurrentYear])}
+        Custom asset 4: ${formatCurrency(customAsset4Balance[localCurrentYear])}, withdrawal: ${formatCurrency(customAsset4Sold[localCurrentYear])}
+        Custom asset 5: ${formatCurrency(customAsset5Balance[localCurrentYear])}, withdrawal: ${formatCurrency(customAsset5Sold[localCurrentYear])}
+        BTC Balance: ${formatCurrency(btcBalance[localCurrentYear])}, withdrawal: ${formatCurrency(
+          btcSold[localCurrentYear],
+          2
+        )}, price: ${formatCurrency(btcPrice)}
+        Stocks Balance: ${formatCurrency(stocksBalance[localCurrentYear])}, withdrawal: ${formatCurrency(stocksSold[localCurrentYear])}
+        Bonds Balance: ${formatCurrency(bondsBalance[localCurrentYear])}, withdrawal: ${formatCurrency(bondsSold[localCurrentYear])}
+        Retirement Success: ${retirementSuccessStatus[localCurrentYear] ? 'Yes' : 'No'}
+        Surplus withdrawal: ${formatCurrency(surplusWithdrawal)}
+        _____________________________________________________
+        60/40 Stocks: ${formatCurrency(currentStocksValue)}, withdrawal: ${formatCurrency(stocksWithdrawal)}
+        60/40 Bonds: ${formatCurrency(currentBondsValue)}, withdrawal: ${formatCurrency(bondsWithdrawal)}
+        60/40 Portfolio: ${formatCurrency(portfolio60_40[localCurrentYear])}
+        Total withdrawal: ${formatCurrency(stocksWithdrawal + bondsWithdrawal)}
+
+        `);
+      }
     }
 
     return {
@@ -994,7 +1912,6 @@ const runCalculations = () => {
       stocksSold,
       bondsBalance,
       bondsSold,
-      cashIncomeBalance,
       btcPrices,
       retirementSuccessStatus,
       portfolio60_40,
@@ -1041,6 +1958,59 @@ const runCalculations = () => {
   );
   // console.log('Annual Stocks Savings: ', annualStocksSavings);
 
+  //------------------ Custom assets annual contributions
+  const annualCustomSavings = getAllRothAndNonRothContributions();
+
+  // Asset 1 annual savings
+  annualCustomAsset1Savings = {};
+  annualCustomAsset1Savings = getAnnualSavingsOrExpenses(
+    inputValues['custom-additional-1'],
+    currentYear + (inputValues['retirement-age'] - currentAge),
+    inputValues['expectancy'],
+    false,
+    true
+  );
+
+  // Asset 2 annual savings
+  annualCustomAsset2Savings = {};
+  annualCustomAsset2Savings = getAnnualSavingsOrExpenses(
+    inputValues['custom-additional-2'],
+    currentYear + (inputValues['retirement-age'] - currentAge),
+    inputValues['expectancy'],
+    false,
+    true
+  );
+
+  // Asset 3 annual savings
+  annualCustomAsset3Savings = {};
+  annualCustomAsset3Savings = getAnnualSavingsOrExpenses(
+    inputValues['custom-additional-3'],
+    currentYear + (inputValues['retirement-age'] - currentAge),
+    inputValues['expectancy'],
+    false,
+    true
+  );
+
+  // Asset 4 annual savings
+  annualCustomAsset4Savings = {};
+  annualCustomAsset4Savings = getAnnualSavingsOrExpenses(
+    inputValues['custom-additional-4'],
+    currentYear + (inputValues['retirement-age'] - currentAge),
+    inputValues['expectancy'],
+    false,
+    true
+  );
+
+  // Asset 5 annual savings
+  annualCustomAsset5Savings = {};
+  annualCustomAsset5Savings = getAnnualSavingsOrExpenses(
+    inputValues['custom-additional-5'],
+    currentYear + (inputValues['retirement-age'] - currentAge),
+    inputValues['expectancy'],
+    false,
+    true
+  );
+
   //------------------ Annual bitcoin savings contribution
   const annualBtcSavings = getAnnualSavingsOrExpenses(
     inputValues['additional-btc'],
@@ -1049,8 +2019,6 @@ const runCalculations = () => {
     false,
     true
   );
-  // console.log('Annual Bitcoin Savings: ', annualBtcSavings);
-
   //------------------ Other annual income
   const annualOtherIncome = getAnnualSavingsOrExpenses(
     inputValues['retirement-income'],
@@ -1059,16 +2027,17 @@ const runCalculations = () => {
     true,
     false
   );
+  // console.log('Annual Bitcoin Savings: ', annualBtcSavings);
+
   // console.log('Annual Other Income: ', annualOtherIncome);
 
   //------------------ Cash balances
-  const annualCashBalances = getCashBalances(annualCashSavings, inputValues['expectancy']);
+  // const annualCashBalances = getCashBalances(annualCashSavings, inputValues['expectancy']);
   // console.log('Cash Balances: ', cashBalances);
 
   //------------------ Annual withdrawals needed
   const annualWithdrawalsNeeded = getWithdrawalsNeeded(
     annualCashExpenses,
-    inputValues['btc-account'],
     currentYear + (inputValues['retirement-age'] - currentAge),
     inputValues['expectancy']
   );
@@ -1087,7 +2056,6 @@ const runCalculations = () => {
     stocksSold,
     bondsBalance,
     bondsSold,
-    cashIncomeBalance,
     btcPrices,
     retirementSuccessStatus,
     portfolio60_40,
@@ -1097,58 +2065,52 @@ const runCalculations = () => {
     annualBtcSavings,
     annualStocksSavings,
     annualBondsSavings,
-    annualCashSavings,
+    annualCustomSavings,
     inputValues['expectancy'],
     currentYear + (inputValues['retirement-age'] - currentAge),
     inputValues['expected-stocks'],
     inputValues['expected-bonds'],
     inputValues['expected-cash'],
     inputValues['expected-btc'],
+    true,
     false
   );
   // console.log('btcPrices', btcPrices);
 
-  //------------------ Always calculate for Roth IRA (if it's not selected)
+  //------------------ Calculate gold line(move all custom assets to btc with roth)
   let totalBalancesRoth = {};
-  if (inputValues['btc-account'] !== 'roth') {
-    const rothAnnualWithdrawalsNeeded =
-      inputValues['btc-account'] !== 'roth'
-        ? getWithdrawalsNeeded(annualCashExpenses, 'roth', currentYear + (inputValues['retirement-age'] - currentAge), inputValues['expectancy'])
-        : false;
-    // const rothAnnualWithdrawalsTaxesPaid = rothAnnualWithdrawalsNeeded
-    //   ? getWithdrawalsTaxesPaid(rothAnnualWithdrawalsNeeded, inputValues['expectancy'], currentYear + (inputValues['retirement-age'] - currentAge))
-    //   : false;
 
-    const {
-      totalBalances: totalBalancesRothL,
-      btcBalance: btcBalanceRoth,
-      btcSold: btcSoldRoth,
-      stocksBalance: stocksBalanceRoth,
-      stocksSold: stocksSoldRoth,
-      bondsBalance: bondsBalanceRoth,
-      bondsSold: bondsSoldRoth,
-      cashIncomeBalance: cashIncomeBalanceRoth,
-      btcPrices: btcPricesRoth,
-      retirementSuccessStatus: retirementSuccessStatusRoth,
-      portfolio60_40: portfolio60_40Roth,
-    } = getAllBalancesAndSold(
-      rothAnnualWithdrawalsNeeded,
-      annualOtherIncome,
-      annualBtcSavings,
-      annualStocksSavings,
-      annualBondsSavings,
-      annualCashSavings,
-      inputValues['expectancy'],
-      currentYear + (inputValues['retirement-age'] - currentAge),
-      inputValues['expected-stocks'],
-      inputValues['expected-bonds'],
-      inputValues['expected-cash'],
-      inputValues['expected-btc']
-    );
+  const {
+    totalBalances: totalBalancesRothL,
+    btcBalance: btcBalanceRoth,
+    btcSold: btcSoldRoth,
+    stocksBalance: stocksBalanceRoth,
+    stocksSold: stocksSoldRoth,
+    bondsBalance: bondsBalanceRoth,
+    bondsSold: bondsSoldRoth,
+    cashIncomeBalance: cashIncomeBalanceRoth,
+    btcPrices: btcPricesRoth,
+    retirementSuccessStatus: retirementSuccessStatusRoth,
+    portfolio60_40: portfolio60_40Roth,
+  } = getAllBalancesAndSold(
+    annualWithdrawalsNeeded,
+    annualOtherIncome,
+    annualBtcSavings,
+    annualStocksSavings,
+    annualBondsSavings,
+    annualCustomSavings,
+    inputValues['expectancy'],
+    currentYear + (inputValues['retirement-age'] - currentAge),
+    inputValues['expected-stocks'],
+    inputValues['expected-bonds'],
+    inputValues['expected-cash'],
+    inputValues['expected-btc'],
+    false,
+    true
+  );
 
-    totalBalancesRoth = totalBalancesRothL;
-    // console.log('Roth IRA selected, calculating for Roth', totalBalancesRoth);
-  }
+  totalBalancesRoth = totalBalancesRothL;
+  // console.log('Roth line', totalBalancesRoth);
 
   const annualBudgetAtRetirement = getAnnualBudgetAtRetirement(annualCashExpenses, currentYear + (inputValues['retirement-age'] - currentAge));
   // console.log('Annual Budget: ', formatCurrency(annualBudgetAtRetirement), 'Monthly Budget: ', formatCurrency(annualBudgetAtRetirement / 12));
@@ -1181,12 +2143,7 @@ const runCalculations = () => {
             true,
             false
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -1217,13 +2174,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -1231,7 +2183,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -1300,12 +2252,7 @@ const runCalculations = () => {
             false
           );
 
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            currentYear + (inputValues['retirement-age'] - currentAge),
-            i
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, currentYear + (inputValues['retirement-age'] - currentAge), i);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -1335,13 +2282,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            currentYear + (inputValues['retirement-age'] - currentAge),
-            i,
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -1349,7 +2291,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             i,
             currentYear + (inputValues['retirement-age'] - currentAge),
             inputValues['expected-stocks'],
@@ -1414,12 +2356,7 @@ const runCalculations = () => {
             true,
             false
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -1449,13 +2386,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -1463,7 +2395,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             i,
@@ -1534,12 +2466,7 @@ const runCalculations = () => {
             true,
             false
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -1569,13 +2496,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -1583,7 +2505,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -1653,12 +2575,7 @@ const runCalculations = () => {
             true,
             false
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -1688,13 +2605,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -1702,7 +2614,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -1772,12 +2684,7 @@ const runCalculations = () => {
             true,
             false
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -1807,13 +2714,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -1821,7 +2723,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -1892,12 +2794,7 @@ const runCalculations = () => {
             false,
             i
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -1931,14 +2828,8 @@ const runCalculations = () => {
             true,
             i
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false,
-            i
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -1946,7 +2837,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -2015,12 +2906,7 @@ const runCalculations = () => {
             true,
             false
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(i, yearOfRetirementL, inputValues['expectancy'], true, false);
           const annualBtcSavingsL = getAnnualSavingsOrExpenses(
@@ -2044,13 +2930,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -2058,7 +2939,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -2122,12 +3003,7 @@ const runCalculations = () => {
           const yearOfRetirementL = currentYear + (inputValues['retirement-age'] - currentAge);
 
           const annualCashExpensesL = getAnnualSavingsOrExpenses(i, yearOfRetirementL, inputValues['expectancy'], true, false);
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -2157,13 +3033,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -2171,7 +3042,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -2241,13 +3112,7 @@ const runCalculations = () => {
             true,
             false
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            i
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy'], i);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -2277,13 +3142,8 @@ const runCalculations = () => {
             false,
             true
           );
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false
-          );
+
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -2291,7 +3151,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -2363,12 +3223,7 @@ const runCalculations = () => {
             inputValues['growth-rate'],
             i
           );
-          const annualWithdrawalsNeededL = getWithdrawalsNeeded(
-            annualCashExpensesL,
-            inputValues['btc-account'],
-            yearOfRetirementL,
-            inputValues['expectancy']
-          );
+          const annualWithdrawalsNeededL = getWithdrawalsNeeded(annualCashExpensesL, yearOfRetirementL, inputValues['expectancy']);
 
           const annualOtherIncomeL = getAnnualSavingsOrExpenses(
             inputValues['retirement-income'],
@@ -2408,15 +3263,7 @@ const runCalculations = () => {
             i
           );
 
-          const annualCashSavingsL = getAnnualSavingsOrExpenses(
-            inputValues['additional-cash'],
-            yearOfRetirementL,
-            inputValues['expectancy'],
-            false,
-            false,
-            inputValues['growth-rate'],
-            i
-          );
+          const annualCustomSavingsL = getAllRothAndNonRothContributions();
 
           const { totalBalances: lastResultTestValue } = getAllBalancesAndSold(
             annualWithdrawalsNeededL,
@@ -2424,7 +3271,7 @@ const runCalculations = () => {
             annualBtcSavingsL,
             annualStocksSavingsL,
             annualBondsSavingsL,
-            annualCashSavingsL,
+            annualCustomSavingsL,
             inputValues['expectancy'],
             yearOfRetirementL,
             inputValues['expected-stocks'],
@@ -2500,6 +3347,8 @@ const runCalculations = () => {
   );
   // updateAllRangesliders();
   updateMainChart(totalBalances, currentYear - currentAge + inputValues['expectancy'], currentAge, portfolio60_40, totalBalancesRoth);
+
+  //-------- End of runSimulation function
 };
 
 //------------------ Main and sidebar chart ------------------
@@ -2509,7 +3358,9 @@ let overviewChart;
 let chartElements = {};
 
 const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40, totalBalancesRoth) => {
+  const isMobileView = window.innerWidth < 991;
   if (!chartInited) {
+    chartElements.chartWrap = document.querySelector('.popup__chart-content.is--main .chart-wrap');
     chartElements.resultsWrap = document.querySelector('.chart-wrap .chart-info');
     chartElements.resultAge = document.querySelector('#chart-res-age');
     chartElements.resultBtc = document.querySelector('#chart-res-btc');
@@ -2554,7 +3405,8 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
   };
 
   let rothData = {};
-  if (Object.keys(totalBalancesRoth).length > 0) {
+
+  if (displayGoldLine) {
     const filteredTotalBalancesRoth = Object.fromEntries(Object.entries(totalBalancesRoth).filter(([year]) => Number(year) <= yearOfDeath));
     rothData = {
       data: Object.values(filteredTotalBalancesRoth),
@@ -2564,19 +3416,12 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
       tension: 0.4,
       pointRadius: 0,
     };
-    totalBalancesData.borderDash = [0, 0];
+    chartElements.rothWrap.classList.remove('hidden');
   } else {
-    rothData = {
-      // Use total balances data
-      data: Object.values(filteredTotalBalances),
-      borderColor: '#db9905',
-      fill: false,
-      borderWidth: 2,
-      tension: 0.4,
-      pointRadius: 0,
-    };
-    totalBalancesData.borderDash = [10, 10];
+    chartElements.rothWrap.classList.add('hidden');
   }
+  if (goldLineEqual) totalBalancesData.borderDash = [10, 10];
+  else totalBalancesData.borderDash = [0, 0];
 
   const ctx = document.querySelector('.calculator-chart').getContext('2d');
   const overviewCtx = document.querySelector('.overview-chart').getContext('2d');
@@ -2584,12 +3429,95 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
   Chart.defaults.font.size = 12;
   Chart.defaults.font.weight = 600;
 
+  // const corsairPlugin = {
+  //   id: 'corsair',
+  //   defaults: {
+  //     width: 1,
+  //     color: '#CCEAF7',
+  //     dash: [3, 3],
+  //   },
+  //   afterInit: (chart, args, opts) => {
+  //     chart.corsair = {
+  //       x: 0,
+  //       y: 0,
+  //     };
+  //   },
+  //   afterEvent: (chart, args) => {
+  //     const { inChartArea } = args;
+  //     const { type, x, y } = args.event;
+  //     chart.corsair = { x, y, draw: inChartArea };
+  //     chart.draw();
+  //   },
+  //   beforeDatasetsDraw: (chart, args, opts) => {
+  //     const { ctx } = chart;
+  //     const { top, bottom } = chart.chartArea;
+  //     const { x, draw } = chart.corsair;
+  //     if (!draw) return;
+
+  //     ctx.save();
+  //     ctx.beginPath();
+  //     ctx.lineWidth = opts.width;
+  //     ctx.strokeStyle = opts.color;
+  //     ctx.moveTo(x, bottom);
+  //     ctx.lineTo(x, top);
+  //     ctx.stroke();
+  //     ctx.restore();
+  //   },
+  // };
+  // const corsairPlugin = {
+  //   id: 'corsair',
+  //   defaults: {
+  //     width: 2,
+  //     color: '#CCEAF7',
+  //     dash: [0, 0],
+  //   },
+  //   afterInit: (chart, args, opts) => {
+  //     chart.corsair = {
+  //       x: 0,
+  //       y: 0,
+  //     };
+  //   },
+  //   afterEvent: (chart, args) => {
+  //     const { inChartArea } = args;
+  //     const { x, y } = args.event;
+
+  //     // Get the nearest data point
+  //     const points = chart.getElementsAtEventForMode(args.event, 'index', { intersect: false });
+
+  //     if (points.length > 0) {
+  //       // Get x position from the nearest point
+  //       const meta = chart.getDatasetMeta(0);
+  //       const element = meta.data[points[0].index];
+  //       chart.corsair = { x: element.x, y, draw: inChartArea };
+  //     } else {
+  //       chart.corsair = { x, y, draw: false };
+  //     }
+
+  //     chart.draw();
+  //   },
+  //   beforeDatasetsDraw: (chart, args, opts) => {
+  //     const { ctx } = chart;
+  //     const { top, bottom } = chart.chartArea;
+  //     const { x, draw } = chart.corsair;
+  //     if (!draw) return;
+
+  //     ctx.save();
+  //     ctx.beginPath();
+  //     ctx.lineWidth = opts.width;
+  //     ctx.strokeStyle = opts.color;
+  //     ctx.setLineDash(opts.dash);
+  //     ctx.moveTo(x, bottom);
+  //     ctx.lineTo(x, top);
+  //     ctx.stroke();
+  //     ctx.restore();
+  //   },
+  // };
   const corsairPlugin = {
     id: 'corsair',
     defaults: {
-      width: 1,
+      width: 2,
       color: '#CCEAF7',
-      dash: [3, 3],
+      dash: [0, 0],
     },
     afterInit: (chart, args, opts) => {
       chart.corsair = {
@@ -2599,8 +3527,36 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
     },
     afterEvent: (chart, args) => {
       const { inChartArea } = args;
-      const { type, x, y } = args.event;
-      chart.corsair = { x, y, draw: inChartArea };
+      const { x, y } = args.event;
+
+      // Get the nearest data point
+      const points = chart.getElementsAtEventForMode(args.event, 'index', { intersect: false });
+
+      if (points.length > 0) {
+        // Get x position from the nearest point
+        const meta = chart.getDatasetMeta(0);
+        const element = meta.data[points[0].index];
+        chart.corsair = { x: element.x, y, draw: inChartArea };
+
+        // Update results display
+        const dataIndex = points[0].index;
+        const age = inputValues['current-age'] + dataIndex;
+        const btcStrat = chart.data.datasets[0].data[dataIndex];
+        const portfolioStrat = chart.data.datasets[1].data[dataIndex];
+        const rothStrat = chart.data.datasets[2]?.data[dataIndex] || 0;
+
+        chartElements.resultAge.textContent = age;
+        chartElements.resultBtc.textContent = formatCurrency(btcStrat);
+        chartElements.result60_40.textContent = formatCurrency(portfolioStrat);
+        chartElements.resultRoth.textContent = formatCurrency(rothStrat);
+        chartElements.resultDifference.textContent = formatCurrency(btcStrat - portfolioStrat);
+
+        chartElements.resultsWrap.classList.remove('is--inactive');
+      } else {
+        chart.corsair = { x, y, draw: false };
+        chartElements.resultsWrap.classList.add('is--inactive');
+      }
+
       chart.draw();
     },
     beforeDatasetsDraw: (chart, args, opts) => {
@@ -2613,10 +3569,119 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
       ctx.beginPath();
       ctx.lineWidth = opts.width;
       ctx.strokeStyle = opts.color;
+      ctx.setLineDash(opts.dash);
       ctx.moveTo(x, bottom);
       ctx.lineTo(x, top);
       ctx.stroke();
       ctx.restore();
+    },
+  };
+  // const dotPlugin = {
+  //   id: 'dotPlugin',
+  //   afterDraw: (chart) => {
+  //     const activeElements = chart.getActiveElements();
+
+  //     if (activeElements.length > 0) {
+  //       const { ctx } = chart;
+  //       const hoveredIndex = activeElements[0].index;
+
+  //       chart.data.datasets.forEach((dataset, datasetIndex) => {
+  //         const meta = chart.getDatasetMeta(datasetIndex);
+  //         const element = meta.data[hoveredIndex];
+
+  //         if (element) {
+  //           ctx.save();
+
+  //           // Draw white border
+  //           ctx.beginPath();
+  //           ctx.arc(element.x, element.y, 7, 0, Math.PI * 2);
+  //           ctx.fillStyle = 'white';
+  //           ctx.fill();
+  //           ctx.closePath();
+
+  //           // Draw colored dot
+  //           ctx.beginPath();
+  //           ctx.arc(element.x, element.y, 5, 0, Math.PI * 2);
+  //           ctx.fillStyle = dataset.borderColor;
+  //           ctx.fill();
+  //           ctx.closePath();
+
+  //           ctx.restore();
+  //         }
+  //       });
+  //     }
+  //   },
+  // };
+  const dotPlugin = {
+    id: 'dotPlugin',
+    afterDraw: (chart) => {
+      const activeElements = chart.getActiveElements();
+
+      if (activeElements.length > 0) {
+        const { ctx } = chart;
+        const hoveredIndex = activeElements[0].index;
+
+        // Draw regular hover dots
+        chart.data.datasets.forEach((dataset, datasetIndex) => {
+          const meta = chart.getDatasetMeta(datasetIndex);
+          const element = meta.data[hoveredIndex];
+
+          if (element) {
+            ctx.save();
+
+            // Draw white border
+            ctx.beginPath();
+            ctx.arc(element.x, element.y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.closePath();
+
+            // Draw colored dot
+            ctx.beginPath();
+            ctx.arc(element.x, element.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = dataset.borderColor;
+            ctx.fill();
+            ctx.closePath();
+
+            ctx.restore();
+          }
+        });
+
+        // Draw target age dot at the top
+        const meta = chart.getDatasetMeta(0); // Get first dataset meta for x position
+        const element = meta.data[hoveredIndex];
+
+        if (element) {
+          ctx.save();
+
+          // Calculate position (use element's x, but fixed y at top)
+          const x = element.x;
+          const y = chart.chartArea.top;
+
+          // Draw white border
+          ctx.beginPath();
+          ctx.arc(x, y, 7, 0, Math.PI * 2);
+          ctx.fillStyle = 'white';
+          ctx.fill();
+          ctx.closePath();
+
+          // Draw dark blue dot
+          ctx.beginPath();
+          ctx.arc(x, y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = '#002851';
+          ctx.fill();
+          ctx.closePath();
+
+          // Add "Target Age" text
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillStyle = '#002851';
+          ctx.font = 'bold 12px Inter';
+          ctx.fillText('Target Age', x, y - 8);
+
+          ctx.restore();
+        }
+      }
     },
   };
 
@@ -2630,9 +3695,22 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
       responsive: true,
       // responsive: false,
       maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
       plugins: {
         legend: {
           display: false,
+        },
+        tooltip: {
+          enabled: false,
+        },
+      },
+      elements: {
+        point: {
+          radius: 0,
+          hoverRadius: 0,
         },
       },
       scales: {
@@ -2657,7 +3735,7 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
             text: 'AGE',
             color: '#0A5999',
             font: {
-              size: 16,
+              size: isMobileView ? 12 : 16,
               weight: 'bold',
             },
           },
@@ -2667,7 +3745,8 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
             weight: 'bold',
             family: 'Inter',
             autoSkip: false,
-            padding: 18,
+            padding: isMobileView ? 10 : 18,
+
             rotation: 0, // Force horizontal alignment
             minRotation: 0, // Prevent automatic rotation
             maxRotation: 0, // Prevent automatic rotation
@@ -2692,7 +3771,7 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
           ticks: {
             padding: 0,
             color: '#0A5999',
-            size: 12,
+            size: isMobileView ? 10 : 12,
             weight: 'bold',
             family: 'Inter',
             callback: (value) => formatCurrencyShort(value),
@@ -2704,10 +3783,16 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
         },
       },
       layout: {
-        padding: 10,
+        // padding: isMobileView ? 0 : 10,
+        padding: {
+          top: 24,
+          bottom: isMobileView ? 0 : 10,
+          left: isMobileView ? 0 : 10,
+          right: isMobileView ? 0 : 10,
+        },
       },
     },
-    plugins: [corsairPlugin],
+    plugins: [corsairPlugin, dotPlugin],
   };
 
   const overviewChartConfig = {
@@ -2719,10 +3804,26 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+
       plugins: {
         legend: {
           display: false,
         },
+        tooltip: {
+          enabled: false,
+        },
+      },
+      elements: {
+        point: {
+          radius: 0,
+          hoverRadius: 0,
+        },
+      },
+      hover: {
+        mode: 'index',
+        intersect: false,
+        enabled: true,
       },
       scales: {
         x: {
@@ -2788,7 +3889,7 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
     },
   };
 
-  if (Object.keys(rothData).length > 0) {
+  if (displayGoldLine) {
     mainChartConfig.data.datasets.push(rothData);
     overviewChartConfig.data.datasets.push(rothData);
   }
@@ -2810,29 +3911,29 @@ const updateMainChart = (totalBalances, yearOfDeath, currentAge, portfolio60_40,
     overviewChart = new Chart(overviewCtx, overviewChartConfig);
 
     // Add hover event listener after chart is created
-    ctx.canvas.addEventListener('mousemove', (event) => {
-      const points = chart.getElementsAtEventForMode(event, 'index', { intersect: false });
-      if (points.length) {
-        const firstPoint = points[0];
-        const dataIndex = firstPoint.index;
-        const age = inputValues['current-age'] + dataIndex;
-        const btcStrat = chart.data.datasets[0].data[dataIndex];
-        const portfolioStrat = chart.data.datasets[1].data[dataIndex];
-        const rothStrat = chart.data.datasets[2]?.data[dataIndex] || 0;
+    // ctx.canvas.addEventListener('mousemove', (event) => {
+    //   const points = chart.getElementsAtEventForMode(event, 'index', { intersect: false });
+    //   if (points.length) {
+    //     const firstPoint = points[0];
+    //     const dataIndex = firstPoint.index;
+    //     const age = inputValues['current-age'] + dataIndex;
+    //     const btcStrat = chart.data.datasets[0].data[dataIndex];
+    //     const portfolioStrat = chart.data.datasets[1].data[dataIndex];
+    //     const rothStrat = chart.data.datasets[2]?.data[dataIndex] || 0;
 
-        chartElements.resultAge.textContent = age;
-        chartElements.resultBtc.textContent = formatCurrency(btcStrat);
-        chartElements.result60_40.textContent = formatCurrency(portfolioStrat);
-        chartElements.resultRoth.textContent = formatCurrency(rothStrat);
-        chartElements.resultDifference.textContent = formatCurrency(btcStrat - portfolioStrat);
+    //     chartElements.resultAge.textContent = age;
+    //     chartElements.resultBtc.textContent = formatCurrency(btcStrat);
+    //     chartElements.result60_40.textContent = formatCurrency(portfolioStrat);
+    //     chartElements.resultRoth.textContent = formatCurrency(rothStrat);
+    //     chartElements.resultDifference.textContent = formatCurrency(btcStrat - portfolioStrat);
 
-        chartElements.resultsWrap.classList.remove('is--inactive');
-      } else chartElements.resultsWrap.classList.add('is--inactive');
-    });
+    //     chartElements.resultsWrap.classList.remove('is--inactive');
+    //   } else chartElements.resultsWrap.classList.add('is--inactive');
+    // });
 
-    ctx.canvas.addEventListener('mouseleave', () => {
-      chartElements.resultsWrap.classList.add('is--inactive');
-    });
+    // ctx.canvas.addEventListener('mouseleave', () => {
+    //   chartElements.resultsWrap.classList.add('is--inactive');
+    // });
 
     chartInited = true;
   }
